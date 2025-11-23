@@ -1,0 +1,21 @@
+#!/bin/bash
+
+if [ $# -lt 1 ]; then
+  echo "Usage: ./crawl <startUrl>"
+  exit 1
+fi
+
+START_URL="$1"
+
+JAR="target/crawler-1.0.jar"
+
+if [ ! -f "$JAR" ]; then
+  echo "JAR not found. Building..."
+  ./mvnw clean package
+  if [ $? -ne 0 ]; then
+    echo "Build failed!"
+    exit 1
+  fi
+fi
+
+java -jar "$JAR" "$START_URL"
