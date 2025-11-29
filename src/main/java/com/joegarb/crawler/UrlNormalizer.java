@@ -25,7 +25,6 @@ public class UrlNormalizer {
       return url;
     }
 
-    // Assume http:// if not specified
     if (!urlToParse.contains("://")) {
       urlToParse = "http://" + urlToParse;
     }
