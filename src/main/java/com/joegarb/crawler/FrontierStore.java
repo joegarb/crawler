@@ -5,6 +5,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,6 +57,29 @@ public class FrontierStore {
   }
 
   /**
+   * Adds multiple URLs to the frontier queue if they don't already exist.
+   *
+   * @param conn Database connection
+   * @param urls List of URLs to add
+   * @throws SQLException if a database access error occurs
+   */
+  public static void addUrls(Connection conn, List<String> urls) throws SQLException {
+    if (urls == null || urls.isEmpty()) {
+      return;
+    }
+
+    String sql = "INSERT OR IGNORE INTO frontier_queue (url) VALUES (?)";
+    try (PreparedStatement statement = conn.prepareStatement(sql)) {
+      for (String url : urls) {
+        String normalizedUrl = UrlNormalizer.normalize(url);
+        statement.setString(1, normalizedUrl);
+        statement.addBatch();
+      }
+      statement.executeBatch();
+    }
+  }
+
+  /**
    * Atomically claims and returns the next pending URL from the frontier queue.
    *
    * @param conn Database connection
@@ -76,6 +100,25 @@ public class FrontierStore {
       }
     }
     return null;
+  }
+
+  /**
+   * Checks if there are any URLs currently claimed by workers.
+   *
+   * @param conn Database connection
+   * @return true if there are claimed URLs, false otherwise
+   * @throws SQLException if a database access error occurs
+   */
+  public static boolean hasClaimedUrls(Connection conn) throws SQLException {
+    String sql = "SELECT COUNT(*) FROM frontier_queue WHERE claimed_at IS NOT NULL";
+    try (PreparedStatement statement = conn.prepareStatement(sql)) {
+      try (ResultSet resultSet = statement.executeQuery()) {
+        if (resultSet.next()) {
+          return resultSet.getInt(1) > 0;
+        }
+      }
+    }
+    return false;
   }
 
   /**

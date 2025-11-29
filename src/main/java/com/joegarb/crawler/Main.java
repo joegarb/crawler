@@ -10,6 +10,9 @@ public class Main {
   private static final Logger logger = LoggerFactory.getLogger(Main.class);
   private static final int NUM_THREADS = 4;
 
+  /** The subdomain being crawled (e.g., "crawlme.example.com"). */
+  static String targetSubdomain;
+
   /**
    * Main method that starts the web crawler.
    *
@@ -22,6 +25,12 @@ public class Main {
     }
 
     String startUrl = args[0];
+
+    targetSubdomain = UrlNormalizer.extractSubdomain(startUrl);
+    if (targetSubdomain == null) {
+      logger.error("Could not extract subdomain from start URL: {}", startUrl);
+      System.exit(1);
+    }
 
     try {
       DatabaseManager.initializeDatabase();
