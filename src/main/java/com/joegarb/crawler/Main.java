@@ -1,5 +1,7 @@
 package com.joegarb.crawler;
 
+import java.sql.Connection;
+import java.sql.SQLException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,6 +22,16 @@ public class Main {
     }
 
     String startUrl = args[0];
+
+    try {
+      DatabaseManager.initializeDatabase();
+      try (Connection conn = DatabaseManager.getConnection()) {
+        FrontierStore.addUrl(conn, startUrl);
+      }
+    } catch (SQLException e) {
+      logger.error("Failed to initialize database", e);
+      System.exit(1);
+    }
 
     logger.info("Start URL: {}", startUrl);
     logger.info("Worker threads: {}", NUM_THREADS);
