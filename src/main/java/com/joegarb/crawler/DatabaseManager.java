@@ -33,6 +33,7 @@ public class DatabaseManager {
         statement.execute("PRAGMA journal_mode=WAL");
       }
       FrontierStore.createTable(connection);
+      MetadataStore.createTable(connection);
       logger.info("Database initialized successfully");
     }
   }

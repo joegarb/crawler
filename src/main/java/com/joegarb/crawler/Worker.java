@@ -22,6 +22,7 @@ public class Worker extends Thread {
 
           // TODO: Fetch and process the URL
 
+          MetadataStore.markAsCrawled(conn, frontierUrl.url());
           FrontierStore.removeUrl(conn, frontierUrl.id());
         } else {
           logger.info("Worker {} complete", Thread.currentThread().getName());
