@@ -16,6 +16,11 @@ public class Worker extends Thread {
 
   @Override
   public void run() {
+    doWork();
+  }
+
+  /** Performs the worker's crawling tasks. Can be called directly or from run(). */
+  public void doWork() {
     while (!Thread.currentThread().isInterrupted()) {
       try (Connection conn = DatabaseManager.getConnection()) {
         FrontierUrl frontierUrl = FrontierStore.getNextUrl(conn);
