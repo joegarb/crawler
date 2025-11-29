@@ -36,34 +36,4 @@ public class UrlNormalizer {
       return url;
     }
   }
-
-  /**
-   * Extracts the subdomain (host) from a URL (e.g., "crawlme.example.com" from
-   * "https://crawlme.example.com/page").
-   *
-   * @param url The URL to extract subdomain from
-   * @return The subdomain (host), or null if extraction fails
-   */
-  public static String extractSubdomain(String url) {
-    if (url == null || url.trim().isEmpty()) {
-      return null;
-    }
-
-    String urlToParse = url.trim();
-
-    if (!urlToParse.contains("://")) {
-      urlToParse = "http://" + urlToParse;
-    }
-
-    try {
-      URL parsedUrl = URL.parse(urlToParse);
-      io.mola.galimatias.Host host = parsedUrl.host();
-      if (host != null) {
-        return host.toString().toLowerCase();
-      }
-    } catch (GalimatiasParseException e) {
-      logger.debug("Could not parse URL for subdomain extraction: {}", url);
-    }
-    return null;
-  }
 }

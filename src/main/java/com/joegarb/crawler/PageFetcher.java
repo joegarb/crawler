@@ -12,13 +12,34 @@ import org.slf4j.LoggerFactory;
 /** Fetches web pages via HTTP. */
 public class PageFetcher {
   private static final Logger logger = LoggerFactory.getLogger(PageFetcher.class);
-  private static final int TIMEOUT_SECONDS = 10;
-  private static final String USER_AGENT = "Crawler/1.0";
+  private static final String USER_AGENT = getUserAgent();
   private static final HttpClient httpClient =
       HttpClient.newBuilder()
-          .connectTimeout(Duration.ofSeconds(TIMEOUT_SECONDS))
+          .connectTimeout(Duration.ofSeconds(Configuration.HTTP_TIMEOUT_SECONDS))
           .followRedirects(HttpClient.Redirect.NORMAL)
           .build();
+
+  /**
+   * Gets the User-Agent string from application metadata.
+   *
+   * @return User-Agent string in format "ApplicationName/Version"
+   */
+  private static String getUserAgent() {
+    try {
+      Package pkg = PageFetcher.class.getPackage();
+      String implementationTitle = pkg.getImplementationTitle();
+      String implementationVersion = pkg.getImplementationVersion();
+
+      if (implementationTitle != null && implementationVersion != null) {
+        return implementationTitle + "/" + implementationVersion;
+      }
+    } catch (Exception e) {
+      logger.debug("Could not read User-Agent from package metadata: {}", e.getMessage());
+    }
+
+    // Fallback
+    return "crawler/1.0";
+  }
 
   /**
    * Result of a page fetch operation.
@@ -76,7 +97,7 @@ public class PageFetcher {
       HttpRequest request =
           HttpRequest.newBuilder()
               .uri(URI.create(url))
-              .timeout(Duration.ofSeconds(TIMEOUT_SECONDS))
+              .timeout(Duration.ofSeconds(Configuration.HTTP_TIMEOUT_SECONDS))
               .header("User-Agent", USER_AGENT)
               .GET()
               .build();

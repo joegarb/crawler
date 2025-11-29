@@ -10,13 +10,12 @@ import org.junit.jupiter.api.Test;
 /** Tests for LinkExtractor. */
 class LinkExtractorTest {
   private static final String BASE_URL = "https://crawlme.example.com/page";
-  private static final String TARGET_SUBDOMAIN = "crawlme.example.com";
 
   @Test
-  void extractsAbsoluteLinksOnSameSubdomain() {
+  void extractsAbsoluteLinksOnSameHost() {
     String html =
         "<html><body><a href=\"https://crawlme.example.com/other\">Link</a></body></html>";
-    List<String> links = LinkExtractor.extractLinks(html, BASE_URL, TARGET_SUBDOMAIN);
+    List<String> links = LinkExtractor.extractLinks(html, BASE_URL);
 
     assertEquals(1, links.size());
     assertTrue(links.contains("https://crawlme.example.com/other"));
@@ -25,7 +24,7 @@ class LinkExtractorTest {
   @Test
   void resolvesRelativeLinks() {
     String html = "<html><body><a href=\"/relative\">Link</a></body></html>";
-    List<String> links = LinkExtractor.extractLinks(html, BASE_URL, TARGET_SUBDOMAIN);
+    List<String> links = LinkExtractor.extractLinks(html, BASE_URL);
 
     assertEquals(1, links.size());
     assertTrue(links.contains("https://crawlme.example.com/relative"));
@@ -39,7 +38,7 @@ class LinkExtractorTest {
             + "<a href=\"https://facebook.com/external\">External</a>"
             + "<a href=\"https://example.com/other\">Other Domain</a>"
             + "</body></html>";
-    List<String> links = LinkExtractor.extractLinks(html, BASE_URL, TARGET_SUBDOMAIN);
+    List<String> links = LinkExtractor.extractLinks(html, BASE_URL);
 
     assertEquals(1, links.size());
     assertTrue(links.contains("https://crawlme.example.com/internal"));
@@ -55,7 +54,7 @@ class LinkExtractorTest {
             + "<a href=\"/page2\">Page 2</a>"
             + "<a href=\"https://crawlme.example.com/page3\">Page 3</a>"
             + "</body></html>";
-    List<String> links = LinkExtractor.extractLinks(html, BASE_URL, TARGET_SUBDOMAIN);
+    List<String> links = LinkExtractor.extractLinks(html, BASE_URL);
 
     assertEquals(3, links.size());
     assertTrue(links.contains("https://crawlme.example.com/page1"));
@@ -66,7 +65,7 @@ class LinkExtractorTest {
   @Test
   void handlesEmptyHtml() {
     String html = "<html><body></body></html>";
-    List<String> links = LinkExtractor.extractLinks(html, BASE_URL, TARGET_SUBDOMAIN);
+    List<String> links = LinkExtractor.extractLinks(html, BASE_URL);
 
     assertTrue(links.isEmpty());
   }
@@ -75,10 +74,32 @@ class LinkExtractorTest {
   void resolvesRelativePaths() {
     // Links without scheme are resolved relative to base URL
     String html = "<html><body><a href=\"not-a-valid-url\">Link</a></body></html>";
-    List<String> links = LinkExtractor.extractLinks(html, BASE_URL, TARGET_SUBDOMAIN);
+    List<String> links = LinkExtractor.extractLinks(html, BASE_URL);
 
     // Relative link gets resolved to base URL's domain
     assertEquals(1, links.size());
     assertTrue(links.contains("https://crawlme.example.com/not-a-valid-url"));
+  }
+
+  @Test
+  void allowsSubdomainsOfHost() {
+    // Should allow subdomains of the target host
+    // e.g., if target is "crawlme.example.com", allow "sub.crawlme.example.com"
+    String html =
+        "<html><body>"
+            + "<a href=\"https://crawlme.example.com/exact\">Exact Match</a>"
+            + "<a href=\"https://sub.crawlme.example.com/subdomain\">Subdomain of Host</a>"
+            + "<a href=\"https://deep.sub.crawlme.example.com/deep\">Deep Subdomain</a>"
+            + "<a href=\"https://example.com/parent\">Parent Domain</a>"
+            + "<a href=\"https://other.example.com/different\">Different Host</a>"
+            + "</body></html>";
+    List<String> links = LinkExtractor.extractLinks(html, BASE_URL);
+
+    assertEquals(3, links.size());
+    assertTrue(links.contains("https://crawlme.example.com/exact"));
+    assertTrue(links.contains("https://sub.crawlme.example.com/subdomain"));
+    assertTrue(links.contains("https://deep.sub.crawlme.example.com/deep"));
+    assertFalse(links.contains("https://example.com/parent"));
+    assertFalse(links.contains("https://other.example.com/different"));
   }
 }

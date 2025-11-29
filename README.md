@@ -2,15 +2,9 @@
 
 A simple web crawler written in Java.
 
-The crawler is limited to crawling a single subdomain. For example, when starting with
-`https://crawlme.example.com/`, it will crawl all pages on `crawlme.example.com` but will not
-follow external links to other domains or subdomains (e.g., `facebook.com`, `example.com`, or
-`community.example.com`).
+By default the crawler is limited to a single host and its subdomains, but this behavior can be changed via configuration.
 
-## Notes
-
-- The crawler waits 1 second between fetching URLs to be polite to the server.
-- It does not currently check `robots.txt` files, since the crawler is designed for crawling a single subdomain.
+For simplicity, and because of being intended for a single host, the crawler simply waits X seconds between fetching URLs to be polite to the server and it does not currencly check `robots.txt`.
 
 ## Prerequisites
 
@@ -29,3 +23,12 @@ On Windows, use `mvnw.cmd` instead.
 ```bash
 ./crawl <startUrl>
 ```
+
+## Configuration
+
+The crawler can be configured using environment variables or the `application.properties` file, with environment variables taking precedence. Some of these include:
+
+- `DB_URL` - Database connection URL (default: `jdbc:sqlite:crawler.db`)
+- `NUM_THREADS` - Number of worker threads per process (default: `4`)
+- `DELAY_BETWEEN_REQUESTS_MS` - Delay in milliseconds between fetching URLs (default: `1000`)
+- `RESTRICT_TO_HOST` - Whether to restrict crawling to the same host and its subdomains (default: `true`)

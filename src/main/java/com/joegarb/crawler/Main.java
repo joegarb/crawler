@@ -8,10 +8,6 @@ import org.slf4j.LoggerFactory;
 /** Main entry point for the web crawler. */
 public class Main {
   private static final Logger logger = LoggerFactory.getLogger(Main.class);
-  private static final int NUM_THREADS = 4;
-
-  /** The subdomain being crawled (e.g., "crawlme.example.com"). */
-  static String targetSubdomain;
 
   /**
    * Main method that starts the web crawler.
@@ -26,12 +22,6 @@ public class Main {
 
     String startUrl = args[0];
 
-    targetSubdomain = UrlNormalizer.extractSubdomain(startUrl);
-    if (targetSubdomain == null) {
-      logger.error("Could not extract subdomain from start URL: {}", startUrl);
-      System.exit(1);
-    }
-
     try {
       DatabaseManager.initializeDatabase();
       try (Connection conn = DatabaseManager.getConnection()) {
@@ -43,10 +33,10 @@ public class Main {
     }
 
     logger.info("Start URL: {}", startUrl);
-    logger.info("Worker threads: {}", NUM_THREADS);
+    logger.info("Worker threads: {}", Configuration.NUM_THREADS);
 
-    Worker[] workers = new Worker[NUM_THREADS];
-    for (int i = 0; i < NUM_THREADS; i++) {
+    Worker[] workers = new Worker[Configuration.NUM_THREADS];
+    for (int i = 0; i < Configuration.NUM_THREADS; i++) {
       workers[i] = new Worker();
       workers[i].start();
     }

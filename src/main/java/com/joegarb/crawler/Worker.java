@@ -14,9 +14,6 @@ public class Worker extends Thread {
   private static final Logger logger = LoggerFactory.getLogger(Worker.class);
   private static final PageFetcher pageFetcher = new PageFetcher();
 
-  /** Delay in milliseconds between processing URLs to be polite to the server. */
-  private static final int DELAY_BETWEEN_REQUESTS_MS = 1000; // 1 second
-
   @Override
   public void run() {
     while (!Thread.currentThread().isInterrupted()) {
@@ -30,8 +27,7 @@ public class Worker extends Thread {
 
           if (result.success() && result.isHtml()) {
             List<String> links =
-                LinkExtractor.extractLinks(
-                    result.response().body(), frontierUrl.url(), Main.targetSubdomain);
+                LinkExtractor.extractLinks(result.response().body(), frontierUrl.url());
 
             StringBuilder output = new StringBuilder(frontierUrl.url());
             for (String link : links) {
@@ -69,7 +65,7 @@ public class Worker extends Thread {
           FrontierStore.removeUrl(conn, frontierUrl.id());
 
           try {
-            Thread.sleep(DELAY_BETWEEN_REQUESTS_MS);
+            Thread.sleep(Configuration.DELAY_BETWEEN_REQUESTS_MS);
           } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             logger.error("Worker {} interrupted during delay", Thread.currentThread().getName());

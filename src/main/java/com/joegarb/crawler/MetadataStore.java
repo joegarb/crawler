@@ -17,12 +17,6 @@ import org.slf4j.LoggerFactory;
 public class MetadataStore {
   private static final Logger logger = LoggerFactory.getLogger(MetadataStore.class);
 
-  /** Time in seconds to wait before retrying a failed URL fetch. */
-  private static final int FAILED_RETRY_INTERVAL_SECONDS = 300; // 5 minutes
-
-  /** Time in seconds to wait before re-fetching a successfully crawled URL. */
-  private static final int SUCCESS_REFRESH_INTERVAL_SECONDS = 86400; // 24 hours
-
   /**
    * Creates the crawled_urls table if it doesn't exist.
    *
@@ -106,10 +100,10 @@ public class MetadataStore {
         int retryInterval;
         if (statusCode != null && statusCode >= 200 && statusCode < 300) {
           // Successful URL - use refresh interval
-          retryInterval = SUCCESS_REFRESH_INTERVAL_SECONDS;
+          retryInterval = Configuration.SUCCESS_REFRESH_INTERVAL_SECONDS;
         } else {
           // Failed URL (non-2xx or NULL) - use retry interval
-          retryInterval = FAILED_RETRY_INTERVAL_SECONDS;
+          retryInterval = Configuration.FAILED_RETRY_INTERVAL_SECONDS;
         }
 
         // Check if enough time has passed
