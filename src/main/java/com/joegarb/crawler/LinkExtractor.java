@@ -3,6 +3,7 @@ package com.joegarb.crawler;
 import io.mola.galimatias.GalimatiasParseException;
 import io.mola.galimatias.URL;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -23,7 +24,7 @@ public class LinkExtractor {
    * @return List of normalized URLs
    */
   public static List<String> extractLinks(String htmlContent, String baseUrl) {
-    List<String> links = new ArrayList<>();
+    LinkedHashSet<String> links = new LinkedHashSet<>();
 
     String targetHost = extractHost(baseUrl);
 
@@ -36,7 +37,7 @@ public class LinkExtractor {
         for (String directive : content.split("[,\\s]+")) {
           if ("nofollow".equals(directive.trim())) {
             logger.debug("Skipping all links on {} due to meta robots nofollow", baseUrl);
-            return links;
+            return new ArrayList<>(links);
           }
         }
       }
@@ -80,7 +81,7 @@ public class LinkExtractor {
       logger.warn("Error parsing HTML for links: {}", e.getMessage());
     }
 
-    return links;
+    return new ArrayList<>(links);
   }
 
   /**
