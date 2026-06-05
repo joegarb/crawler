@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 public class Worker extends Thread {
   private static final Logger logger = LoggerFactory.getLogger(Worker.class);
   private static final PageFetcher pageFetcher = new PageFetcher();
+  private static final int POLL_INTERVAL_MS = 500;
 
   @Override
   public void run() {
@@ -67,21 +68,18 @@ public class Worker extends Thread {
                 conn, frontierUrl.url(), result.httpStatusCode(), result.errorMessage());
           }
 
+          DomainAccessStore.recordAccess(conn, frontierUrl.domain());
           FrontierStore.removeUrl(conn, frontierUrl.id());
-
-          try {
-            Thread.sleep(Configuration.DELAY_BETWEEN_REQUESTS_MS);
-          } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            logger.error("Worker {} interrupted during delay", Thread.currentThread().getName());
-            break;
-          }
         } else {
-          // No url available to crawl, but check if other workers are processing urls in case more
-          // urls could get added
-          if (FrontierStore.hasClaimedUrls(conn)) {
-            // Other workers are processing - continue loop to check again
-            continue;
+          // No URL claimable right now — either all domains are cooling down or the queue is empty
+          if (FrontierStore.hasQueuedUrls(conn) || FrontierStore.hasClaimedUrls(conn)) {
+            try {
+              Thread.sleep(POLL_INTERVAL_MS);
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+              logger.error("Worker {} interrupted during delay", Thread.currentThread().getName());
+              break;
+            }
           } else {
             break;
           }

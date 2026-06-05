@@ -18,9 +18,9 @@ public class Configuration {
   /** Number of worker threads per process. */
   public static final int NUM_THREADS = getIntProperty("num.threads", "NUM_THREADS", 4);
 
-  /** Delay in milliseconds between processing URLs. */
-  public static final int DELAY_BETWEEN_REQUESTS_MS =
-      getIntProperty("delay.between.requests.ms", "DELAY_BETWEEN_REQUESTS_MS", 1000);
+  /** Minimum delay in milliseconds between requests to the same domain. */
+  public static final int POLITENESS_DELAY_MS =
+      getIntProperty("politeness.delay.ms", "POLITENESS_DELAY_MS", 1000);
 
   /** HTTP timeout in seconds. */
   public static final int HTTP_TIMEOUT_SECONDS =
@@ -36,7 +36,7 @@ public class Configuration {
 
   /** Whether to restrict crawling to the same host (and its subdomains). */
   public static final boolean RESTRICT_TO_HOST =
-      getBooleanProperty("restrict.to.host", "RESTRICT_TO_HOST", true);
+      getBooleanProperty("restrict.to.host", "RESTRICT_TO_HOST", false);
 
   /**
    * Loads properties from application.properties file.

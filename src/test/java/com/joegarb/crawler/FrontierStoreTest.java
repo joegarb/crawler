@@ -1,6 +1,7 @@
 package com.joegarb.crawler;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -21,6 +22,7 @@ class FrontierStoreTest {
     // In-memory database
     conn = DriverManager.getConnection("jdbc:sqlite::memory:");
     FrontierStore.createTable(conn);
+    DomainAccessStore.createTable(conn);
   }
 
   @Test
@@ -37,6 +39,16 @@ class FrontierStoreTest {
   }
 
   @Test
+  void addUrlStoresDomain() throws SQLException {
+    FrontierStore.addUrl(conn, "https://example.com/page");
+    try (Statement statement = conn.createStatement();
+        ResultSet resultSet = statement.executeQuery("SELECT domain FROM frontier_queue")) {
+      assertTrue(resultSet.next());
+      assertEquals("example.com", resultSet.getString("domain"));
+    }
+  }
+
+  @Test
   void getNextUrlReturnsNullWhenEmpty() throws SQLException {
     FrontierStore.FrontierUrl frontierUrl = FrontierStore.getNextUrl(conn);
     assertNull(frontierUrl);
@@ -48,6 +60,7 @@ class FrontierStoreTest {
     FrontierStore.FrontierUrl frontierUrl = FrontierStore.getNextUrl(conn);
     assertTrue(frontierUrl != null);
     assertEquals("https://example.com/", frontierUrl.url());
+    assertEquals("example.com", frontierUrl.domain());
     assertTrue(frontierUrl.id() > 0);
     // Verify URL is now claimed
     try (Statement statement = conn.createStatement();
@@ -79,6 +92,64 @@ class FrontierStoreTest {
     // Should get the first one added
     FrontierStore.FrontierUrl frontierUrl = FrontierStore.getNextUrl(conn);
     assertEquals("https://example.com/1", frontierUrl.url());
+  }
+
+  @Test
+  void getNextUrlSkipsDomainInCooldown() throws SQLException {
+    FrontierStore.addUrl(conn, "https://example.com/page");
+    // Record a very recent access for example.com
+    try (Statement statement = conn.createStatement()) {
+      statement.execute(
+          "INSERT INTO domain_access (domain, last_fetched_at) VALUES ('example.com', datetime('now'))");
+    }
+    // Domain is cooling — should not be claimable
+    assertNull(FrontierStore.getNextUrl(conn));
+  }
+
+  @Test
+  void getNextUrlReturnsUrlWhenCooldownExpired() throws SQLException {
+    FrontierStore.addUrl(conn, "https://example.com/page");
+    // Record an old access — well beyond the 1-second default delay
+    try (Statement statement = conn.createStatement()) {
+      statement.execute(
+          "INSERT INTO domain_access (domain, last_fetched_at) VALUES ('example.com', datetime('now', '-10 seconds'))");
+    }
+    FrontierStore.FrontierUrl frontierUrl = FrontierStore.getNextUrl(conn);
+    assertTrue(frontierUrl != null);
+    assertEquals("https://example.com/page", frontierUrl.url());
+  }
+
+  @Test
+  void getNextUrlSkipsOneDomainButReturnsAnother() throws SQLException {
+    FrontierStore.addUrl(conn, "https://example.com/page");
+    FrontierStore.addUrl(conn, "https://other.com/page");
+    // Put example.com in cooldown
+    try (Statement statement = conn.createStatement()) {
+      statement.execute(
+          "INSERT INTO domain_access (domain, last_fetched_at) VALUES ('example.com', datetime('now'))");
+    }
+    // Should return other.com instead
+    FrontierStore.FrontierUrl frontierUrl = FrontierStore.getNextUrl(conn);
+    assertTrue(frontierUrl != null);
+    assertEquals("https://other.com/page", frontierUrl.url());
+  }
+
+  @Test
+  void hasQueuedUrlsReturnsFalseWhenEmpty() throws SQLException {
+    assertFalse(FrontierStore.hasQueuedUrls(conn));
+  }
+
+  @Test
+  void hasQueuedUrlsReturnsTrueWhenUnclaimed() throws SQLException {
+    FrontierStore.addUrl(conn, "https://example.com");
+    assertTrue(FrontierStore.hasQueuedUrls(conn));
+  }
+
+  @Test
+  void hasQueuedUrlsReturnsFalseWhenAllClaimed() throws SQLException {
+    FrontierStore.addUrl(conn, "https://example.com");
+    FrontierStore.getNextUrl(conn);
+    assertFalse(FrontierStore.hasQueuedUrls(conn));
   }
 
   @Test

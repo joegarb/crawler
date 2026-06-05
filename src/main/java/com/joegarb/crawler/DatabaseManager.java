@@ -36,6 +36,7 @@ public class DatabaseManager {
       }
       FrontierStore.createTable(connection);
       MetadataStore.createTable(connection);
+      DomainAccessStore.createTable(connection);
       logger.info("Database initialized successfully");
     }
   }

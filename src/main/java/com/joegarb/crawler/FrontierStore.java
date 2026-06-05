@@ -5,6 +5,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,8 +20,10 @@ import org.slf4j.LoggerFactory;
  */
 public class FrontierStore {
   private static final Logger logger = LoggerFactory.getLogger(FrontierStore.class);
+  private static final DateTimeFormatter SQLITE_DATETIME =
+      DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-  public static record FrontierUrl(long id, String url) {}
+  public static record FrontierUrl(long id, String url, String domain) {}
 
   /**
    * Creates the frontier_queue table if it doesn't exist.
@@ -31,6 +36,7 @@ public class FrontierStore {
         "CREATE TABLE IF NOT EXISTS frontier_queue ("
             + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
             + "url TEXT NOT NULL UNIQUE,"
+            + "domain TEXT,"
             + "added_at TEXT NOT NULL DEFAULT (datetime('now')),"
             + "claimed_at TEXT"
             + ")";
@@ -49,9 +55,11 @@ public class FrontierStore {
    */
   public static void addUrl(Connection conn, String url) throws SQLException {
     String normalizedUrl = UrlNormalizer.normalize(url);
-    String sql = "INSERT OR IGNORE INTO frontier_queue (url) VALUES (?)";
+    String domain = UrlNormalizer.extractDomain(normalizedUrl);
+    String sql = "INSERT OR IGNORE INTO frontier_queue (url, domain) VALUES (?, ?)";
     try (PreparedStatement statement = conn.prepareStatement(sql)) {
       statement.setString(1, normalizedUrl);
+      statement.setString(2, domain);
       statement.executeUpdate();
     }
   }
@@ -68,11 +76,13 @@ public class FrontierStore {
       return;
     }
 
-    String sql = "INSERT OR IGNORE INTO frontier_queue (url) VALUES (?)";
+    String sql = "INSERT OR IGNORE INTO frontier_queue (url, domain) VALUES (?, ?)";
     try (PreparedStatement statement = conn.prepareStatement(sql)) {
       for (String url : urls) {
         String normalizedUrl = UrlNormalizer.normalize(url);
+        String domain = UrlNormalizer.extractDomain(normalizedUrl);
         statement.setString(1, normalizedUrl);
+        statement.setString(2, domain);
         statement.addBatch();
       }
       statement.executeBatch();
@@ -80,26 +90,58 @@ public class FrontierStore {
   }
 
   /**
-   * Atomically claims and returns the next pending URL from the frontier queue.
+   * Atomically claims and returns the next pending URL whose domain is not within the politeness
+   * cooldown window.
    *
    * @param conn Database connection
-   * @return The next URL entry to crawl (with ID and URL), or null if the queue is empty
+   * @return The next claimable URL entry, or null if none is available
    * @throws SQLException if a database access error occurs
    */
   public static FrontierUrl getNextUrl(Connection conn) throws SQLException {
+    String cutoff =
+        LocalDateTime.now(ZoneOffset.UTC)
+            .minusNanos((long) Configuration.POLITENESS_DELAY_MS * 1_000_000L)
+            .format(SQLITE_DATETIME);
+
     String sql =
         "UPDATE frontier_queue SET claimed_at = datetime('now') WHERE id = ("
-            + "SELECT id FROM frontier_queue WHERE claimed_at IS NULL "
-            + "ORDER BY added_at ASC LIMIT 1"
-            + ") RETURNING id, url";
+            + "SELECT fq.id FROM frontier_queue fq"
+            + " WHERE fq.claimed_at IS NULL"
+            + " AND (fq.domain IS NULL OR NOT EXISTS ("
+            + "  SELECT 1 FROM domain_access da"
+            + "  WHERE da.domain = fq.domain AND da.last_fetched_at > ?"
+            + " ))"
+            + " ORDER BY fq.added_at ASC LIMIT 1"
+            + ") RETURNING id, url, domain";
     try (PreparedStatement statement = conn.prepareStatement(sql)) {
+      statement.setString(1, cutoff);
       try (ResultSet resultSet = statement.executeQuery()) {
         if (resultSet.next()) {
-          return new FrontierUrl(resultSet.getLong("id"), resultSet.getString("url"));
+          return new FrontierUrl(
+              resultSet.getLong("id"), resultSet.getString("url"), resultSet.getString("domain"));
         }
       }
     }
     return null;
+  }
+
+  /**
+   * Checks if there are any unclaimed URLs in the frontier (regardless of cooldown).
+   *
+   * @param conn Database connection
+   * @return true if there are unclaimed URLs waiting, false otherwise
+   * @throws SQLException if a database access error occurs
+   */
+  public static boolean hasQueuedUrls(Connection conn) throws SQLException {
+    String sql = "SELECT COUNT(*) FROM frontier_queue WHERE claimed_at IS NULL";
+    try (PreparedStatement statement = conn.prepareStatement(sql)) {
+      try (ResultSet resultSet = statement.executeQuery()) {
+        if (resultSet.next()) {
+          return resultSet.getInt(1) > 0;
+        }
+      }
+    }
+    return false;
   }
 
   /**

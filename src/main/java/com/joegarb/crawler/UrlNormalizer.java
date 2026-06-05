@@ -10,6 +10,32 @@ public class UrlNormalizer {
   private static final Logger logger = LoggerFactory.getLogger(UrlNormalizer.class);
 
   /**
+   * Extracts the hostname from a URL (e.g. "example.com" from "https://example.com/page").
+   *
+   * @param url The URL to extract the host from
+   * @return The lowercase host, or null if extraction fails
+   */
+  public static String extractDomain(String url) {
+    if (url == null) {
+      return null;
+    }
+    String urlToParse = url.trim();
+    if (urlToParse.isEmpty()) {
+      return null;
+    }
+    if (!urlToParse.contains("://")) {
+      urlToParse = "http://" + urlToParse;
+    }
+    try {
+      io.mola.galimatias.Host host = URL.parse(urlToParse).host();
+      return host != null ? host.toString().toLowerCase() : null;
+    } catch (GalimatiasParseException e) {
+      logger.debug("Could not extract domain from URL: {}", url);
+      return null;
+    }
+  }
+
+  /**
    * Normalizes a URL to a canonical form.
    *
    * @param url The URL to normalize
