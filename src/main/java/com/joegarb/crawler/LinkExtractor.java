@@ -29,11 +29,37 @@ public class LinkExtractor {
 
     try {
       Document doc = Jsoup.parse(htmlContent, baseUrl);
+
+      // If the page instructs robots not to follow links, return nothing
+      for (Element meta : doc.select("meta[name=robots]")) {
+        String content = meta.attr("content").toLowerCase();
+        for (String directive : content.split("[,\\s]+")) {
+          if ("nofollow".equals(directive.trim())) {
+            logger.debug("Skipping all links on {} due to meta robots nofollow", baseUrl);
+            return links;
+          }
+        }
+      }
+
       Elements linkElements = doc.select("a[href]");
 
       for (Element element : linkElements) {
         String href = element.attr("href");
         if (href == null || href.isEmpty()) {
+          continue;
+        }
+
+        // Skip links explicitly marked nofollow
+        String rel = element.attr("rel").toLowerCase();
+        boolean isNofollow = false;
+        for (String relValue : rel.split("\\s+")) {
+          if ("nofollow".equals(relValue)) {
+            isNofollow = true;
+            break;
+          }
+        }
+        if (isNofollow) {
+          logger.debug("Skipping nofollow link: {}", href);
           continue;
         }
 

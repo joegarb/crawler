@@ -38,9 +38,16 @@ Run in worker-only mode using the `--worker` flag. In worker mode, the process r
 
 ## Configuration
 
-The crawler can be configured using environment variables or the `application.properties` file, with environment variables taking precedence. Some of these include:
+The crawler can be configured using environment variables or the `application.properties` file, with environment variables taking precedence. They can be prepended to the `./crawl` command inline:
+
+```bash
+DELAY_BETWEEN_REQUESTS_MS=500 RESTRICT_TO_HOST=false ./crawl <startUrl>
+```
+
+Some of these include:
 
 - `DB_URL` - Database connection URL (default: `jdbc:sqlite:crawler.db`)
 - `NUM_THREADS` - Number of worker threads per process in normal mode (default: `4`). Not used in worker mode (runs single worker on main thread).
 - `DELAY_BETWEEN_REQUESTS_MS` - Delay in milliseconds between fetching URLs (default: `1000`)
 - `RESTRICT_TO_HOST` - Whether to restrict crawling to the same host and its subdomains (default: `true`)
+- `LOG_LEVEL` - Log level (default: `INFO`, set to `DEBUG` for verbose output)

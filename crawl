@@ -18,4 +18,4 @@ if [ ! -f "$JAR" ]; then
   fi
 fi
 
-java -jar "$JAR" "$START_URL"
+java ${LOG_LEVEL:+-DLOG_LEVEL=$LOG_LEVEL} -jar "$JAR" "$START_URL"

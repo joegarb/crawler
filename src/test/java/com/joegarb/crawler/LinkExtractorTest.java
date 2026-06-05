@@ -82,6 +82,54 @@ class LinkExtractorTest {
   }
 
   @Test
+  void skipsNofollowLinks() {
+    String html =
+        "<html><body>"
+            + "<a href=\"/follow\">Follow</a>"
+            + "<a href=\"/nofollow\" rel=\"nofollow\">Nofollow</a>"
+            + "</body></html>";
+    List<String> links = LinkExtractor.extractLinks(html, BASE_URL);
+
+    assertEquals(1, links.size());
+    assertTrue(links.contains("https://crawlme.example.com/follow"));
+    assertFalse(links.contains("https://crawlme.example.com/nofollow"));
+  }
+
+  @Test
+  void skipsNofollowLinksWithMultipleRelValues() {
+    String html =
+        "<html><body>"
+            + "<a href=\"/nofollow\" rel=\"nofollow noreferrer\">Nofollow</a>"
+            + "</body></html>";
+    List<String> links = LinkExtractor.extractLinks(html, BASE_URL);
+
+    assertTrue(links.isEmpty());
+  }
+
+  @Test
+  void skipsAllLinksWhenPageMetaRobotsNofollow() {
+    String html =
+        "<html><head><meta name=\"robots\" content=\"nofollow\"></head>"
+            + "<body>"
+            + "<a href=\"/page1\">Page 1</a>"
+            + "<a href=\"/page2\">Page 2</a>"
+            + "</body></html>";
+    List<String> links = LinkExtractor.extractLinks(html, BASE_URL);
+
+    assertTrue(links.isEmpty());
+  }
+
+  @Test
+  void skipsAllLinksWhenPageMetaRobotsNofollowWithMultipleDirectives() {
+    String html =
+        "<html><head><meta name=\"robots\" content=\"noindex, nofollow\"></head>"
+            + "<body><a href=\"/page1\">Page 1</a></body></html>";
+    List<String> links = LinkExtractor.extractLinks(html, BASE_URL);
+
+    assertTrue(links.isEmpty());
+  }
+
+  @Test
   void allowsSubdomainsOfHost() {
     // Should allow subdomains of the target host
     // e.g., if target is "crawlme.example.com", allow "sub.crawlme.example.com"
