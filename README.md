@@ -20,6 +20,12 @@ On Windows, use `mvnw.cmd` instead.
 ./crawl <startUrl>
 ```
 
+To resume a previously interrupted crawl, omit the URL — the crawler will continue from the existing frontier:
+
+```bash
+./crawl
+```
+
 ## Configuration
 
 The crawler can be configured using environment variables or the `application.properties` file, with environment variables taking precedence. They can be prepended to the `./crawl` command inline:

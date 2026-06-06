@@ -12,7 +12,8 @@ public class Main {
   /**
    * Main method that starts the web crawler.
    *
-   * @param args Command line arguments. Requires a start URL as the first argument.
+   * @param args Command line arguments. Pass a start URL to seed the frontier, or omit to resume
+   *     from an existing queue.
    */
   public static void main(String[] args) {
     String startUrl = null;
@@ -23,17 +24,20 @@ public class Main {
       }
     }
 
-    if (startUrl == null) {
-      logger.error("No start URL provided. Usage: java -jar crawler.jar <startUrl>");
-      System.exit(1);
-    }
-
     try {
       DatabaseManager.initializeDatabase();
       try (Connection conn = DatabaseManager.getConnection()) {
-        FrontierStore.addUrl(conn, startUrl);
+        FrontierStore.resetClaimedUrls(conn);
+        if (startUrl != null) {
+          FrontierStore.addUrl(conn, startUrl);
+          logger.info("Start URL: {}", startUrl);
+        } else if (!FrontierStore.hasQueuedUrls(conn) && !FrontierStore.hasClaimedUrls(conn)) {
+          logger.error("No start URL provided and frontier is empty.");
+          System.exit(1);
+        } else {
+          logger.info("Resuming from existing frontier");
+        }
       }
-      logger.info("Start URL: {}", startUrl);
     } catch (SQLException e) {
       logger.error("Failed to initialize database", e);
       System.exit(1);

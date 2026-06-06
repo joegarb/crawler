@@ -177,4 +177,21 @@ public class FrontierStore {
       statement.executeUpdate();
     }
   }
+
+  /**
+   * Resets all claimed URLs back to unclaimed. Called on startup to recover URLs that were
+   * in-flight when the process was last killed.
+   *
+   * @param conn Database connection
+   * @throws SQLException if a database access error occurs
+   */
+  public static void resetClaimedUrls(Connection conn) throws SQLException {
+    String sql = "UPDATE frontier_queue SET claimed_at = NULL WHERE claimed_at IS NOT NULL";
+    try (Statement statement = conn.createStatement()) {
+      int count = statement.executeUpdate(sql);
+      if (count > 0) {
+        logger.info("Reset {} claimed URL(s) from previous run", count);
+      }
+    }
+  }
 }

@@ -1,10 +1,5 @@
 #!/bin/bash
 
-if [ $# -lt 1 ]; then
-  echo "Usage: ./crawl <startUrl>"
-  exit 1
-fi
-
 START_URL="$1"
 
 JAR="target/crawler-1.0.jar"
@@ -18,4 +13,4 @@ if [ ! -f "$JAR" ]; then
   fi
 fi
 
-java ${LOG_LEVEL:+-DLOG_LEVEL=$LOG_LEVEL} -jar "$JAR" "$START_URL"
+java ${LOG_LEVEL:+-DLOG_LEVEL=$LOG_LEVEL} -jar "$JAR" ${START_URL:+"$START_URL"}
