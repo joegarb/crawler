@@ -1,6 +1,7 @@
 package com.joegarb.crawler;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.Connection;
@@ -8,6 +9,9 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -69,5 +73,20 @@ class DomainAccessStoreTest {
       assertTrue(resultSet.next());
       assertEquals(0, resultSet.getInt("count"));
     }
+  }
+
+  @Test
+  void getLastFetchedAtReturnsEmptyForUnknownDomain() throws SQLException {
+    Optional<Instant> result = DomainAccessStore.getLastFetchedAt(conn, "unknown.com");
+    assertTrue(result.isEmpty());
+  }
+
+  @Test
+  void getLastFetchedAtReturnsPresentAfterRecordAccess() throws SQLException {
+    Instant before = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+    DomainAccessStore.recordAccess(conn, "example.com");
+    Optional<Instant> result = DomainAccessStore.getLastFetchedAt(conn, "example.com");
+    assertTrue(result.isPresent());
+    assertFalse(result.get().isBefore(before));
   }
 }
