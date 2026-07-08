@@ -20,7 +20,11 @@ public class RobotsCache {
 
   public record RobotsRule(boolean allow, String path) {}
 
-  public record RobotsRules(List<RobotsRule> rules, OptionalLong crawlDelayMs) {}
+  public record RobotsRules(List<RobotsRule> rules, OptionalLong crawlDelayMs) {
+    public RobotsRules {
+      rules = List.copyOf(rules);
+    }
+  }
 
   /**
    * Returns whether the given URL is allowed by the cached robots.txt for its domain.
