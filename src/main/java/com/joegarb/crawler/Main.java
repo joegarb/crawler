@@ -2,6 +2,8 @@ package com.joegarb.crawler;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,23 +18,24 @@ public class Main {
    *     from an existing queue.
    */
   public static void main(String[] args) {
-    String startUrl = null;
-
+    List<String> startUrls = new ArrayList<>();
     for (String arg : args) {
-      if (startUrl == null && !arg.startsWith("--")) {
-        startUrl = arg;
+      if (!arg.startsWith("--")) {
+        startUrls.add(arg);
       }
     }
+    SeedSource seedSource = new StaticSeedSource(startUrls);
 
     try {
       DatabaseManager.initializeDatabase();
       try (Connection conn = DatabaseManager.getConnection()) {
         FrontierStore.resetClaimedUrls(conn);
-        if (startUrl != null) {
-          FrontierStore.addUrl(conn, startUrl);
-          logger.info("Start URL: {}", startUrl);
+        List<String> seeds = seedSource.seeds();
+        if (!seeds.isEmpty()) {
+          FrontierStore.addUrls(conn, seeds);
+          logger.info("Seed URLs: {}", seeds);
         } else if (!FrontierStore.hasQueuedUrls(conn) && !FrontierStore.hasClaimedUrls(conn)) {
-          logger.error("No start URL provided and frontier is empty.");
+          logger.error("No seed URLs provided and frontier is empty.");
           System.exit(1);
         } else {
           logger.info("Resuming from existing frontier");
