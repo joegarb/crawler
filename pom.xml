@@ -78,7 +78,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-checkstyle-plugin</artifactId>
-                <version>3.3.1</version>
+                <version>3.6.0</version>
                 <configuration>
                     <configLocation>https://raw.githubusercontent.com/checkstyle/checkstyle/checkstyle-10.12.5/src/main/resources/google_checks.xml</configLocation>
                     <consoleOutput>true</consoleOutput>
