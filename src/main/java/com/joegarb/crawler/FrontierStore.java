@@ -91,7 +91,7 @@ public class FrontierStore {
 
   /**
    * Atomically claims and returns the next pending URL whose domain is not within the politeness
-   * cooldown window.
+   * cooldown window, reserving that domain in the same transaction.
    *
    * @param conn Database connection
    * @return The next claimable URL entry, or null if none is available
@@ -103,7 +103,7 @@ public class FrontierStore {
             .minusNanos((long) Configuration.POLITENESS_DELAY_MS * 1_000_000L)
             .format(SQLITE_DATETIME);
 
-    String sql =
+    String claimSql =
         "UPDATE frontier_queue SET claimed_at = datetime('now') WHERE id = ("
             + "SELECT fq.id FROM frontier_queue fq"
             + " WHERE fq.claimed_at IS NULL"
@@ -113,16 +113,43 @@ public class FrontierStore {
             + " ))"
             + " ORDER BY fq.added_at ASC LIMIT 1"
             + ") RETURNING id, url, domain";
-    try (PreparedStatement statement = conn.prepareStatement(sql)) {
-      statement.setString(1, cutoff);
-      try (ResultSet resultSet = statement.executeQuery()) {
-        if (resultSet.next()) {
-          return new FrontierUrl(
-              resultSet.getLong("id"), resultSet.getString("url"), resultSet.getString("domain"));
+
+    boolean originalAutoCommit = conn.getAutoCommit();
+    conn.setAutoCommit(false);
+    try {
+      FrontierUrl claimed = null;
+      try (PreparedStatement statement = conn.prepareStatement(claimSql)) {
+        statement.setString(1, cutoff);
+        try (ResultSet resultSet = statement.executeQuery()) {
+          if (resultSet.next()) {
+            claimed =
+                new FrontierUrl(
+                    resultSet.getLong("id"),
+                    resultSet.getString("url"),
+                    resultSet.getString("domain"));
+          }
         }
       }
+
+      // Reserve the domain so no other worker can claim a second URL for it during the cooldown.
+      if (claimed != null && claimed.domain() != null) {
+        try (PreparedStatement reserve =
+            conn.prepareStatement(
+                "INSERT OR REPLACE INTO domain_access (domain, last_fetched_at)"
+                    + " VALUES (?, datetime('now'))")) {
+          reserve.setString(1, claimed.domain());
+          reserve.executeUpdate();
+        }
+      }
+
+      conn.commit();
+      return claimed;
+    } catch (SQLException e) {
+      conn.rollback();
+      throw e;
+    } finally {
+      conn.setAutoCommit(originalAutoCommit);
     }
-    return null;
   }
 
   /**

@@ -135,6 +135,19 @@ class FrontierStoreTest {
   }
 
   @Test
+  void getNextUrlReservesDomainAtClaimTime() throws SQLException {
+    // Two URLs of the same domain, no prior domain access recorded.
+    FrontierStore.addUrl(conn, "https://example.com/1");
+    FrontierStore.addUrl(conn, "https://example.com/2");
+    // Claiming the first URL should reserve the domain immediately...
+    FrontierStore.FrontierUrl first = FrontierStore.getNextUrl(conn);
+    assertTrue(first != null);
+    // ...so the second URL is not claimable until the cooldown elapses, even though it is
+    // unclaimed and the first URL has not yet been "fetched".
+    assertNull(FrontierStore.getNextUrl(conn));
+  }
+
+  @Test
   void hasQueuedUrlsReturnsFalseWhenEmpty() throws SQLException {
     assertFalse(FrontierStore.hasQueuedUrls(conn));
   }

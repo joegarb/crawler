@@ -17,7 +17,16 @@ public class DatabaseManager {
    * @throws SQLException if a database access error occurs
    */
   public static Connection getConnection() throws SQLException {
-    return DriverManager.getConnection(Configuration.DB_URL);
+    Connection connection = DriverManager.getConnection(Configuration.DB_URL);
+    if (Configuration.DB_URL.startsWith("jdbc:sqlite:")) {
+      try (var statement = connection.createStatement()) {
+        // Wait for a contended write lock rather than failing immediately with SQLITE_BUSY. The
+        // claim transaction in FrontierStore.getNextUrl holds the write lock across two statements,
+        // so concurrent workers must briefly serialize on it.
+        statement.execute("PRAGMA busy_timeout=5000");
+      }
+    }
+    return connection;
   }
 
   /**
