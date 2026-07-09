@@ -45,6 +45,41 @@ This writes `report.json` (see `REPORT_FILE`) with two sections:
 
 Run a crawl first to populate the data, then `--report` to summarize it — for example, on a schedule.
 
+## Running with Docker
+
+Images are published to `ghcr.io/joegarb/crawler`. Mount a volume for the database so change detection persists between runs:
+
+```bash
+docker run --rm -v crawler-data:/data \
+  -e DB_URL=jdbc:sqlite:/data/crawler.db \
+  ghcr.io/joegarb/crawler:latest https://example.com
+```
+
+Generate the report from the same volume:
+
+```bash
+docker run --rm -v crawler-data:/data \
+  -e DB_URL=jdbc:sqlite:/data/crawler.db -e REPORT_FILE=/data/report.json \
+  ghcr.io/joegarb/crawler:latest --report
+```
+
+As a Compose service (it's a batch job, so schedule it rather than running it as a long-lived service):
+
+```yaml
+services:
+  crawler:
+    image: ghcr.io/joegarb/crawler:latest
+    volumes:
+      - crawler-data:/data
+    environment:
+      - DB_URL=jdbc:sqlite:/data/crawler.db
+      - REPORT_FILE=/data/report.json
+    command: ["https://example.com"]
+
+volumes:
+  crawler-data:
+```
+
 ## Configuration
 
 The crawler can be configured using environment variables or the `application.properties` file, with environment variables taking precedence. They can be prepended to the `./crawl` command inline:

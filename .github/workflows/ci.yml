@@ -20,3 +20,38 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
       - run: ./mvnw verify
+      - name: Build Docker image
+        run: docker build -t crawler:ci .
+      - name: Smoke-test image
+        run: docker run --rm crawler:ci --report
+
+  publish-pr:
+    if: github.event_name == 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push PR image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          tags: ghcr.io/joegarb/crawler:pr-${{ github.event.pull_request.number }}
