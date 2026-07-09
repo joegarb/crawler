@@ -109,3 +109,5 @@ buildNumber.properties
 .ionide
 
 # End of https://www.toptal.com/developers/gitignore/api/java,macos,maven,visualstudiocode,database
+
+report.json
