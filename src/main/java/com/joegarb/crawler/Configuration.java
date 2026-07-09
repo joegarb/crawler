@@ -38,6 +38,9 @@ public class Configuration {
   public static final boolean RESTRICT_TO_HOST =
       getBooleanProperty("restrict.to.host", "RESTRICT_TO_HOST", false);
 
+  /** File path the JSON monitor report is written to in --report mode. */
+  public static final String REPORT_FILE = getProperty("report.file", "REPORT_FILE", "report.json");
+
   /**
    * Loads properties from application.properties file.
    *
