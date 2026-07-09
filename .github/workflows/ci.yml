@@ -20,3 +20,7 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
       - run: ./mvnw verify
+      - name: Build Docker image
+        run: docker build -t crawler:ci .
+      - name: Smoke-test image
+        run: docker run --rm crawler:ci --report
