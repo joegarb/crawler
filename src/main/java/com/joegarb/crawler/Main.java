@@ -1,5 +1,6 @@
 package com.joegarb.crawler;
 
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -19,15 +20,27 @@ public class Main {
    */
   public static void main(String[] args) {
     List<String> startUrls = new ArrayList<>();
+    boolean reportMode = false;
     for (String arg : args) {
-      if (!arg.startsWith("--")) {
+      if (arg.equals("--report")) {
+        reportMode = true;
+      } else if (!arg.startsWith("--")) {
         startUrls.add(arg);
       }
     }
-    SeedSource seedSource = new StaticSeedSource(startUrls);
 
     try {
       DatabaseManager.initializeDatabase();
+      if (reportMode) {
+        try (Connection conn = DatabaseManager.getConnection()) {
+          ReportGenerator.Report report = ReportGenerator.generate(conn);
+          ReportGenerator.writeJson(report, Configuration.REPORT_FILE);
+          logger.info("{}", ReportGenerator.summarize(report));
+          logger.info("Report written to {}", Configuration.REPORT_FILE);
+        }
+        return;
+      }
+      SeedSource seedSource = new StaticSeedSource(startUrls);
       try (Connection conn = DatabaseManager.getConnection()) {
         FrontierStore.resetClaimedUrls(conn);
         List<String> seeds = seedSource.seeds();
@@ -43,6 +56,9 @@ public class Main {
       }
     } catch (SQLException e) {
       logger.error("Failed to initialize database", e);
+      System.exit(1);
+    } catch (IOException e) {
+      logger.error("Failed to write report", e);
       System.exit(1);
     }
 
