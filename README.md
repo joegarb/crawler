@@ -45,6 +45,12 @@ This writes `report.json` (see `REPORT_FILE`) with two sections:
 
 Run a crawl first to populate the data, then `--report` to summarize it — for example, on a schedule.
 
+Pages whose content is inherently volatile (index or feed pages that reshuffle on every request) can be excluded from change tracking with `CHANGE_TRACKING_EXCLUDE_URLS` — a comma-separated list of URL glob patterns (`*` wildcard). They are still crawled for link discovery and health, just not reported as changed:
+
+```bash
+CHANGE_TRACKING_EXCLUDE_URLS='*/intelligence/,*/feed/' ./crawl <startUrl>
+```
+
 ## Running with Docker
 
 Images are published to `ghcr.io/joegarb/crawler`. Mount a volume for the database so change detection persists between runs:
@@ -95,4 +101,5 @@ Some of these include:
 - `POLITENESS_DELAY_MS` - Minimum delay in milliseconds between requests to the same domain (default: `1000`)
 - `RESTRICT_TO_HOST` - Whether to restrict crawling to the same host and its subdomains (default: `false`)
 - `REPORT_FILE` - File path the JSON report is written to in `--report` mode (default: `report.json`)
+- `CHANGE_TRACKING_EXCLUDE_URLS` - Comma-separated URL glob patterns excluded from change tracking (default: none)
 - `LOG_LEVEL` - Log level (default: `INFO`, set to `DEBUG` for verbose output)

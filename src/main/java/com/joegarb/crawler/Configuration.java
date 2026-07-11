@@ -1,6 +1,8 @@
 package com.joegarb.crawler;
 
 import java.io.InputStream;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Properties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,6 +42,21 @@ public class Configuration {
 
   /** File path the JSON monitor report is written to in --report mode. */
   public static final String REPORT_FILE = getProperty("report.file", "REPORT_FILE", "report.json");
+
+  /**
+   * URL glob patterns (comma-separated) excluded from change tracking, e.g. volatile index pages.
+   */
+  public static final UrlExcluder CHANGE_TRACKING_EXCLUDER =
+      new UrlExcluder(
+          splitList(
+              getProperty("change.tracking.exclude.urls", "CHANGE_TRACKING_EXCLUDE_URLS", "")));
+
+  private static List<String> splitList(String csv) {
+    if (csv == null || csv.isBlank()) {
+      return List.of();
+    }
+    return Arrays.stream(csv.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
+  }
 
   /**
    * Loads properties from application.properties file.
