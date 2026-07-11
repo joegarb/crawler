@@ -26,4 +26,31 @@ class ContentHasherTest {
     String b = "<body><input type=\"hidden\" name=\"csrf\" value=\"zzz\">Welcome</body>";
     assertEquals(ContentHasher.hash(a), ContentHasher.hash(b));
   }
+
+  @Test
+  void ignoresChangesOutsideMainContentWhenArticlePresent() {
+    // The <article> body is identical; only a sibling widget changes — should NOT count.
+    String a =
+        "<body><article>Real content</article>" + "<aside>You May Also Like: Post A</aside></body>";
+    String b =
+        "<body><article>Real content</article>" + "<aside>You May Also Like: Post Z</aside></body>";
+    assertEquals(ContentHasher.hash(a), ContentHasher.hash(b));
+  }
+
+  @Test
+  void detectsChangesWithinMainContent() {
+    String a = "<body><article>First version</article><aside>sidebar</aside></body>";
+    String b = "<body><article>Second version</article><aside>sidebar</aside></body>";
+    assertNotEquals(ContentHasher.hash(a), ContentHasher.hash(b));
+  }
+
+  @Test
+  void fallsBackToBodyWhenNoMainContentElement() {
+    // No <article>/<main>: a page with no such landmark still hashes its body text.
+    assertEquals(
+        ContentHasher.hash("<body><p>Hello</p></body>"), ContentHasher.hash("<p>Hello</p>"));
+    assertNotEquals(
+        ContentHasher.hash("<body><p>Hello</p></body>"),
+        ContentHasher.hash("<body><p>Different</p></body>"));
+  }
 }
