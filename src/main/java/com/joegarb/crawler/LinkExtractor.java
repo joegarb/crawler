@@ -67,6 +67,14 @@ public class LinkExtractor {
         try {
           // Resolve relative URLs against the base URL
           URL absoluteUrl = URL.parse(baseUrl).resolve(href);
+
+          // Only crawl web pages, not mailto:, tel:, javascript:, etc.
+          String scheme = absoluteUrl.scheme();
+          if (!"http".equals(scheme) && !"https".equals(scheme)) {
+            logger.debug("Skipping non-HTTP link: {}", href);
+            continue;
+          }
+
           String normalizedUrl = UrlNormalizer.normalize(absoluteUrl.toString());
 
           // Check if link should be included based on host restriction

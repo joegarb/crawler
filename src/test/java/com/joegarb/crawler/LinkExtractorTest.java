@@ -130,6 +130,21 @@ class LinkExtractorTest {
   }
 
   @Test
+  void skipsNonHttpLinks() {
+    String html =
+        "<html><body>"
+            + "<a href=\"mailto:founders@crawlme.example.com\">Email</a>"
+            + "<a href=\"tel:+15551234567\">Call</a>"
+            + "<a href=\"javascript:void(0)\">JS</a>"
+            + "<a href=\"/real-page\">Real</a>"
+            + "</body></html>";
+    List<String> links = LinkExtractor.extractLinks(html, BASE_URL);
+
+    assertEquals(1, links.size());
+    assertTrue(links.contains("https://crawlme.example.com/real-page"));
+  }
+
+  @Test
   void allowsSubdomainsOfHost() {
     // Should allow subdomains of the target host
     // e.g., if target is "crawlme.example.com", allow "sub.crawlme.example.com"
