@@ -6,20 +6,35 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import org.jsoup.Jsoup;
 
-/** Computes a content fingerprint for an HTML page based on its visible text. */
+/** Computes a content fingerprint for an HTML page based on its main visible text. */
 public final class ContentHasher {
   private ContentHasher() {}
 
+  // Landmark first, whole-body fallback. A richer extractor (e.g. Readability) can be prepended.
+  private static final ContentExtractor DEFAULT_EXTRACTOR =
+      new ContentExtractorChain(new SelectorContentExtractor(), new BodyContentExtractor());
+
   /**
-   * Returns a SHA-256 hex digest of the page's normalized visible text. Hashing the extracted text
-   * rather than raw HTML avoids false positives from markup churn such as CSRF tokens, timestamps,
-   * or reordered attributes.
+   * Returns a SHA-256 hex digest of the page's main visible text using the default extractor.
    *
    * @param html the raw HTML
-   * @return lowercase hex SHA-256 of the normalized visible text
+   * @return lowercase hex SHA-256 of the extracted text
    */
   public static String hash(String html) {
-    String text = Jsoup.parse(html).text();
+    return hash(html, DEFAULT_EXTRACTOR);
+  }
+
+  /**
+   * Returns a SHA-256 hex digest of the page text selected by the given extractor. Hashing
+   * extracted text rather than raw HTML keeps the fingerprint stable against markup churn and
+   * rotating chrome.
+   *
+   * @param html the raw HTML
+   * @param extractor selects which text to fingerprint
+   * @return lowercase hex SHA-256 of the extracted text
+   */
+  public static String hash(String html, ContentExtractor extractor) {
+    String text = extractor.extract(Jsoup.parse(html)).orElse("");
     try {
       MessageDigest digest = MessageDigest.getInstance("SHA-256");
       byte[] bytes = digest.digest(text.getBytes(StandardCharsets.UTF_8));
