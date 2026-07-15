@@ -89,10 +89,12 @@ public class Worker extends Thread {
               FrontierStore.addUrls(conn, urlsToAdd);
             }
 
-            String contentHash = ContentHasher.hash(result.response().body());
-            ChangeStatus changeStatus = ContentStore.record(conn, frontierUrl.url(), contentHash);
-            if (changeStatus != ChangeStatus.UNCHANGED) {
-              logger.info("Content {} for {}", changeStatus, frontierUrl.url());
+            if (!Configuration.CHANGE_TRACKING_EXCLUDER.isExcluded(frontierUrl.url())) {
+              String contentHash = ContentHasher.hash(result.response().body());
+              ChangeStatus changeStatus = ContentStore.record(conn, frontierUrl.url(), contentHash);
+              if (changeStatus != ChangeStatus.UNCHANGED) {
+                logger.info("Content {} for {}", changeStatus, frontierUrl.url());
+              }
             }
 
             MetadataStore.markAsCrawled(conn, frontierUrl.url(), result.httpStatusCode(), null);
