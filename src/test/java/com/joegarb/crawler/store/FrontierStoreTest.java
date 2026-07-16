@@ -135,6 +135,48 @@ class FrontierStoreTest {
   }
 
   @Test
+  void getNextUrlHonorsDomainCrawlDelayBeyondDefault() throws SQLException {
+    FrontierStore.addUrl(conn, "https://example.com/page");
+    // Last fetch was 5 seconds ago — past the 1-second default politeness delay, but within the
+    // domain's 60-second robots.txt Crawl-delay
+    try (Statement statement = conn.createStatement()) {
+      statement.execute(
+          "INSERT INTO domain_access (domain, last_fetched_at, crawl_delay_ms)"
+              + " VALUES ('example.com', datetime('now', '-5 seconds'), 60000)");
+    }
+    assertNull(FrontierStore.getNextUrl(conn));
+  }
+
+  @Test
+  void getNextUrlReturnsUrlWhenCrawlDelayExpired() throws SQLException {
+    FrontierStore.addUrl(conn, "https://example.com/page");
+    // Last fetch was 5 seconds ago and the domain's Crawl-delay is 3 seconds
+    try (Statement statement = conn.createStatement()) {
+      statement.execute(
+          "INSERT INTO domain_access (domain, last_fetched_at, crawl_delay_ms)"
+              + " VALUES ('example.com', datetime('now', '-5 seconds'), 3000)");
+    }
+    FrontierStore.FrontierUrl frontierUrl = FrontierStore.getNextUrl(conn);
+    assertTrue(frontierUrl != null);
+    assertEquals("https://example.com/page", frontierUrl.url());
+  }
+
+  @Test
+  void getNextUrlSkipsCrawlDelayedDomainButReturnsAnother() throws SQLException {
+    FrontierStore.addUrl(conn, "https://example.com/page");
+    FrontierStore.addUrl(conn, "https://other.com/page");
+    // example.com is within its Crawl-delay window
+    try (Statement statement = conn.createStatement()) {
+      statement.execute(
+          "INSERT INTO domain_access (domain, last_fetched_at, crawl_delay_ms)"
+              + " VALUES ('example.com', datetime('now', '-5 seconds'), 60000)");
+    }
+    FrontierStore.FrontierUrl frontierUrl = FrontierStore.getNextUrl(conn);
+    assertTrue(frontierUrl != null);
+    assertEquals("https://other.com/page", frontierUrl.url());
+  }
+
+  @Test
   void getNextUrlReservesDomainAtClaimTime() throws SQLException {
     // Two URLs of the same domain, no prior domain access recorded.
     FrontierStore.addUrl(conn, "https://example.com/1");
@@ -145,6 +187,25 @@ class FrontierStoreTest {
     // ...so the second URL is not claimable until the cooldown elapses, even though it is
     // unclaimed and the first URL has not yet been "fetched".
     assertNull(FrontierStore.getNextUrl(conn));
+  }
+
+  @Test
+  void getNextUrlReservationPreservesCrawlDelay() throws SQLException {
+    FrontierStore.addUrl(conn, "https://example.com/page");
+    try (Statement statement = conn.createStatement()) {
+      statement.execute(
+          "INSERT INTO domain_access (domain, last_fetched_at, crawl_delay_ms)"
+              + " VALUES ('example.com', datetime('now', '-5 seconds'), 3000)");
+    }
+    assertTrue(FrontierStore.getNextUrl(conn) != null);
+    // Claiming reserved the domain but must keep its stored Crawl-delay
+    try (Statement statement = conn.createStatement();
+        ResultSet resultSet =
+            statement.executeQuery(
+                "SELECT crawl_delay_ms FROM domain_access WHERE domain = 'example.com'")) {
+      assertTrue(resultSet.next());
+      assertEquals(3000, resultSet.getLong("crawl_delay_ms"));
+    }
   }
 
   @Test

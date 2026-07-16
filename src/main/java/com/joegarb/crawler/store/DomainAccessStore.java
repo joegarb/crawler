@@ -2,22 +2,14 @@ package com.joegarb.crawler.store;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
-import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Tracks when each domain was last fetched to enforce per-domain politeness delays. */
 public class DomainAccessStore {
   private static final Logger logger = LoggerFactory.getLogger(DomainAccessStore.class);
-  private static final DateTimeFormatter SQLITE_DATETIME =
-      DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
   /**
    * Creates the domain_access table if it doesn't exist.
@@ -29,7 +21,8 @@ public class DomainAccessStore {
     String sql =
         "CREATE TABLE IF NOT EXISTS domain_access ("
             + "domain TEXT PRIMARY KEY,"
-            + "last_fetched_at TEXT NOT NULL"
+            + "last_fetched_at TEXT NOT NULL,"
+            + "crawl_delay_ms INTEGER"
             + ")";
     try (Statement statement = conn.createStatement()) {
       statement.execute(sql);
@@ -49,8 +42,8 @@ public class DomainAccessStore {
       return;
     }
     String sql =
-        "INSERT OR REPLACE INTO domain_access (domain, last_fetched_at)"
-            + " VALUES (?, datetime('now'))";
+        "INSERT INTO domain_access (domain, last_fetched_at) VALUES (?, datetime('now'))"
+            + " ON CONFLICT(domain) DO UPDATE SET last_fetched_at = excluded.last_fetched_at";
     try (PreparedStatement statement = conn.prepareStatement(sql)) {
       statement.setString(1, domain);
       statement.executeUpdate();
@@ -59,27 +52,28 @@ public class DomainAccessStore {
   }
 
   /**
-   * Returns the last time the given domain was fetched, or empty if never fetched.
+   * Records the robots.txt Crawl-delay for the given domain so the frontier can enforce it when
+   * selecting URLs to claim.
    *
    * @param conn Database connection
-   * @param domain The domain to query
-   * @return The last fetch time as an Instant (UTC), or empty if not found
+   * @param domain The domain the delay applies to
+   * @param crawlDelayMs The Crawl-delay in milliseconds
    * @throws SQLException if a database access error occurs
    */
-  public static Optional<Instant> getLastFetchedAt(Connection conn, String domain)
+  public static void recordCrawlDelay(Connection conn, String domain, long crawlDelayMs)
       throws SQLException {
-    String sql = "SELECT last_fetched_at FROM domain_access WHERE domain = ?";
+    if (domain == null) {
+      return;
+    }
+    String sql =
+        "INSERT INTO domain_access (domain, last_fetched_at, crawl_delay_ms)"
+            + " VALUES (?, datetime('now'), ?)"
+            + " ON CONFLICT(domain) DO UPDATE SET crawl_delay_ms = excluded.crawl_delay_ms";
     try (PreparedStatement statement = conn.prepareStatement(sql)) {
       statement.setString(1, domain);
-      try (ResultSet resultSet = statement.executeQuery()) {
-        if (resultSet.next()) {
-          String timestamp = resultSet.getString("last_fetched_at");
-          Instant instant =
-              LocalDateTime.parse(timestamp, SQLITE_DATETIME).toInstant(ZoneOffset.UTC);
-          return Optional.of(instant);
-        }
-      }
+      statement.setLong(2, crawlDelayMs);
+      statement.executeUpdate();
+      logger.debug("Recorded crawl delay {} ms for domain: {}", crawlDelayMs, domain);
     }
-    return Optional.empty();
   }
 }

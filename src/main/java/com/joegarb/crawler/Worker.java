@@ -14,11 +14,8 @@ import com.joegarb.crawler.store.FrontierStore;
 import com.joegarb.crawler.store.MetadataStore;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.OptionalLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,28 +48,13 @@ public class Worker extends Thread {
             continue;
           }
 
-          // Enforce Crawl-delay from robots.txt if it exceeds the configured politeness delay
+          // Persist the domain's robots.txt Crawl-delay so the frontier enforces it when
+          // claiming subsequent URLs for the domain
           if (frontierUrl.domain() != null) {
             OptionalLong robotsCrawlDelayMs = RobotsCache.getCrawlDelayMs(frontierUrl.domain());
-            if (robotsCrawlDelayMs.isPresent()
-                && robotsCrawlDelayMs.getAsLong() > Configuration.POLITENESS_DELAY_MS) {
-              Optional<Instant> lastFetched =
-                  DomainAccessStore.getLastFetchedAt(conn, frontierUrl.domain());
-              if (lastFetched.isPresent()) {
-                long elapsed = Duration.between(lastFetched.get(), Instant.now()).toMillis();
-                long remaining = robotsCrawlDelayMs.getAsLong() - elapsed;
-                if (remaining > 0) {
-                  try {
-                    Thread.sleep(remaining);
-                  } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    logger.error(
-                        "Worker {} interrupted during crawl-delay sleep",
-                        Thread.currentThread().getName());
-                    break;
-                  }
-                }
-              }
+            if (robotsCrawlDelayMs.isPresent()) {
+              DomainAccessStore.recordCrawlDelay(
+                  conn, frontierUrl.domain(), robotsCrawlDelayMs.getAsLong());
             }
           }
 
