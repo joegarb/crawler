@@ -1,5 +1,6 @@
 package com.joegarb.crawler;
 
+import com.joegarb.crawler.url.UrlExcluder;
 import java.io.InputStream;
 import java.util.Arrays;
 import java.util.List;

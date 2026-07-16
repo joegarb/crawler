@@ -1,7 +1,17 @@
 package com.joegarb.crawler;
 
-import static com.joegarb.crawler.FrontierStore.FrontierUrl;
+import static com.joegarb.crawler.store.FrontierStore.FrontierUrl;
 
+import com.joegarb.crawler.extract.ContentHasher;
+import com.joegarb.crawler.extract.LinkExtractor;
+import com.joegarb.crawler.fetch.PageFetcher;
+import com.joegarb.crawler.fetch.RobotsCache;
+import com.joegarb.crawler.store.ChangeStatus;
+import com.joegarb.crawler.store.ContentStore;
+import com.joegarb.crawler.store.DatabaseManager;
+import com.joegarb.crawler.store.DomainAccessStore;
+import com.joegarb.crawler.store.FrontierStore;
+import com.joegarb.crawler.store.MetadataStore;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Duration;

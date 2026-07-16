@@ -1,5 +1,10 @@
 package com.joegarb.crawler;
 
+import com.joegarb.crawler.report.ReportGenerator;
+import com.joegarb.crawler.seed.SeedSource;
+import com.joegarb.crawler.seed.StaticSeedSource;
+import com.joegarb.crawler.store.DatabaseManager;
+import com.joegarb.crawler.store.FrontierStore;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
