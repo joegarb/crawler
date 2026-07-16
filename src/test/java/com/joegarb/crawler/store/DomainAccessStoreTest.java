@@ -1,7 +1,6 @@
 package com.joegarb.crawler.store;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.Connection;
@@ -9,9 +8,6 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -76,17 +72,67 @@ class DomainAccessStoreTest {
   }
 
   @Test
-  void getLastFetchedAtReturnsEmptyForUnknownDomain() throws SQLException {
-    Optional<Instant> result = DomainAccessStore.getLastFetchedAt(conn, "unknown.com");
-    assertTrue(result.isEmpty());
+  void recordCrawlDelayCreatesEntryForNewDomain() throws SQLException {
+    DomainAccessStore.recordCrawlDelay(conn, "example.com", 5000);
+
+    try (Statement statement = conn.createStatement();
+        ResultSet resultSet =
+            statement.executeQuery(
+                "SELECT crawl_delay_ms FROM domain_access WHERE domain = 'example.com'")) {
+      assertTrue(resultSet.next());
+      assertEquals(5000, resultSet.getLong("crawl_delay_ms"));
+    }
   }
 
   @Test
-  void getLastFetchedAtReturnsPresentAfterRecordAccess() throws SQLException {
-    Instant before = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+  void recordCrawlDelayPreservesLastFetchedAt() throws SQLException {
     DomainAccessStore.recordAccess(conn, "example.com");
-    Optional<Instant> result = DomainAccessStore.getLastFetchedAt(conn, "example.com");
-    assertTrue(result.isPresent());
-    assertFalse(result.get().isBefore(before));
+
+    String firstTimestamp;
+    try (Statement statement = conn.createStatement();
+        ResultSet resultSet =
+            statement.executeQuery(
+                "SELECT last_fetched_at FROM domain_access WHERE domain = 'example.com'")) {
+      assertTrue(resultSet.next());
+      firstTimestamp = resultSet.getString("last_fetched_at");
+    }
+
+    DomainAccessStore.recordCrawlDelay(conn, "example.com", 5000);
+
+    try (Statement statement = conn.createStatement();
+        ResultSet resultSet =
+            statement.executeQuery(
+                "SELECT last_fetched_at, crawl_delay_ms FROM domain_access"
+                    + " WHERE domain = 'example.com'")) {
+      assertTrue(resultSet.next());
+      assertEquals(firstTimestamp, resultSet.getString("last_fetched_at"));
+      assertEquals(5000, resultSet.getLong("crawl_delay_ms"));
+    }
+  }
+
+  @Test
+  void recordAccessPreservesCrawlDelay() throws SQLException {
+    DomainAccessStore.recordCrawlDelay(conn, "example.com", 5000);
+    DomainAccessStore.recordAccess(conn, "example.com");
+
+    try (Statement statement = conn.createStatement();
+        ResultSet resultSet =
+            statement.executeQuery(
+                "SELECT crawl_delay_ms FROM domain_access WHERE domain = 'example.com'")) {
+      assertTrue(resultSet.next());
+      assertEquals(5000, resultSet.getLong("crawl_delay_ms"));
+    }
+  }
+
+  @Test
+  void recordCrawlDelayIgnoresNullDomain() throws SQLException {
+    DomainAccessStore.recordCrawlDelay(conn, null, 5000);
+
+    try (Statement statement = conn.createStatement();
+        ResultSet resultSet =
+            statement.executeQuery("SELECT COUNT(*) as count FROM domain_access")) {
+      assertTrue(resultSet.next());
+      assertEquals(0, resultSet.getInt("count"));
+    }
   }
 }

@@ -7,9 +7,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,8 +19,6 @@ import org.slf4j.LoggerFactory;
  */
 public class FrontierStore {
   private static final Logger logger = LoggerFactory.getLogger(FrontierStore.class);
-  private static final DateTimeFormatter SQLITE_DATETIME =
-      DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
   public static record FrontierUrl(long id, String url, String domain) {}
 
@@ -92,26 +87,24 @@ public class FrontierStore {
   }
 
   /**
-   * Atomically claims and returns the next pending URL whose domain is not within the politeness
-   * cooldown window, reserving that domain in the same transaction.
+   * Atomically claims and returns the next pending URL whose domain is not within its cooldown
+   * window, reserving that domain in the same transaction. The cooldown per domain is the larger of
+   * the configured politeness delay and the domain's robots.txt Crawl-delay, if known.
    *
    * @param conn Database connection
    * @return The next claimable URL entry, or null if none is available
    * @throws SQLException if a database access error occurs
    */
   public static FrontierUrl getNextUrl(Connection conn) throws SQLException {
-    String cutoff =
-        LocalDateTime.now(ZoneOffset.UTC)
-            .minusNanos((long) Configuration.POLITENESS_DELAY_MS * 1_000_000L)
-            .format(SQLITE_DATETIME);
-
     String claimSql =
         "UPDATE frontier_queue SET claimed_at = datetime('now') WHERE id = ("
             + "SELECT fq.id FROM frontier_queue fq"
             + " WHERE fq.claimed_at IS NULL"
             + " AND (fq.domain IS NULL OR NOT EXISTS ("
             + "  SELECT 1 FROM domain_access da"
-            + "  WHERE da.domain = fq.domain AND da.last_fetched_at > ?"
+            + "  WHERE da.domain = fq.domain"
+            + "  AND da.last_fetched_at > datetime('now',"
+            + "   '-' || (max(?, coalesce(da.crawl_delay_ms, 0)) / 1000.0) || ' seconds')"
             + " ))"
             + " ORDER BY fq.added_at ASC LIMIT 1"
             + ") RETURNING id, url, domain";
@@ -121,7 +114,7 @@ public class FrontierStore {
     try {
       FrontierUrl claimed = null;
       try (PreparedStatement statement = conn.prepareStatement(claimSql)) {
-        statement.setString(1, cutoff);
+        statement.setLong(1, Configuration.POLITENESS_DELAY_MS);
         try (ResultSet resultSet = statement.executeQuery()) {
           if (resultSet.next()) {
             claimed =
@@ -137,8 +130,10 @@ public class FrontierStore {
       if (claimed != null && claimed.domain() != null) {
         try (PreparedStatement reserve =
             conn.prepareStatement(
-                "INSERT OR REPLACE INTO domain_access (domain, last_fetched_at)"
-                    + " VALUES (?, datetime('now'))")) {
+                "INSERT INTO domain_access (domain, last_fetched_at)"
+                    + " VALUES (?, datetime('now'))"
+                    + " ON CONFLICT(domain) DO UPDATE SET"
+                    + " last_fetched_at = excluded.last_fetched_at")) {
           reserve.setString(1, claimed.domain());
           reserve.executeUpdate();
         }
