@@ -42,8 +42,10 @@ Generate a JSON report of what changed and which URLs are unhealthy, then exit w
 
 This writes `report.json` (see `REPORT_FILE`) with two sections:
 
-- `changes` — pages that are new or whose content changed since the previous crawl
+- `changes` — pages that are new or whose content changed since the previous report
 - `health` — how many URLs were crawled, how many are healthy, and details of any that returned an error or non-success status (URLs skipped for robots.txt are not counted as problems)
+
+It also writes `report.md` (see `REPORT_MD_FILE`) — the same report as self-describing markdown prose, suitable for dropping straight into an email or digest by other tools without any knowledge of the crawler.
 
 Run a crawl first to populate the data, then `--report` to summarize it — for example, on a schedule.
 
@@ -119,6 +121,7 @@ Some of these include:
 - `POLITENESS_DELAY_MS` - Minimum delay in milliseconds between requests to the same domain (default: `1000`)
 - `RESTRICT_TO_HOST` - Whether to restrict crawling to the same host and its subdomains (default: `true`)
 - `REPORT_FILE` - File path the JSON report is written to in `--report` mode (default: `report.json`)
+- `REPORT_MD_FILE` - File path the markdown report is written to in `--report` mode (default: `report.md`)
 - `CHANGE_TRACKING_EXCLUDE_URLS` - Comma-separated URL glob patterns excluded from change tracking (default: none)
 - `SEED_FROM_DOCKER_LABELS` - Discover seed URLs from Traefik router rules on running containers (default: `false`)
 - `DOCKER_SOCKET` - Docker socket path for label-based seed discovery (default: `/var/run/docker.sock`)

@@ -11,6 +11,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -51,27 +52,32 @@ public final class ReportGenerator {
    * @throws SQLException if a database access error occurs
    */
   public static Report generate(Connection conn) throws SQLException {
-    return new Report(Instant.now().toString(), queryChanges(conn), queryHealth(conn));
+    return new Report(
+        Instant.now().truncatedTo(ChronoUnit.SECONDS).toString(),
+        queryChanges(conn),
+        queryHealth(conn));
   }
 
   /**
-   * Builds the report, writes it as JSON, and advances the reported-content baseline so the next
-   * report only includes changes detected after this one. The baseline advances only if the report
-   * file is written successfully.
+   * Builds the report, writes it as JSON and as human-readable markdown, and advances the
+   * reported-content baseline so the next report only includes changes detected after this one. The
+   * baseline advances only if the report files are written successfully.
    *
    * @param conn Database connection
-   * @param path destination file path
+   * @param jsonPath destination path for the JSON report
+   * @param markdownPath destination path for the markdown report
    * @return the written report
    * @throws SQLException if a database access error occurs
-   * @throws IOException if the file cannot be written
+   * @throws IOException if a file cannot be written
    */
-  public static Report generateAndWrite(Connection conn, String path)
+  public static Report generateAndWrite(Connection conn, String jsonPath, String markdownPath)
       throws SQLException, IOException {
     boolean originalAutoCommit = conn.getAutoCommit();
     conn.setAutoCommit(false);
     try {
       Report report = generate(conn);
-      writeJson(report, path);
+      writeJson(report, jsonPath);
+      Files.writeString(Path.of(markdownPath), toMarkdown(report));
       markReported(conn);
       conn.commit();
       return report;
@@ -81,6 +87,63 @@ public final class ReportGenerator {
     } finally {
       conn.setAutoCommit(originalAutoCommit);
     }
+  }
+
+  /**
+   * Renders the report as self-describing markdown prose, suitable for direct inclusion in an email
+   * or digest without knowledge of the crawler.
+   *
+   * @param report the report to render
+   * @return the markdown text
+   */
+  public static String toMarkdown(Report report) {
+    StringBuilder md = new StringBuilder();
+    md.append("# Site monitor report\n\n");
+    md.append(
+        "Website change and availability report for the monitored sites, generated "
+            + report.generatedAt()
+            + ". Content changes are those detected since the previous report.\n");
+    md.append("\n**Summary: " + summarize(report) + "**\n");
+
+    md.append("\n## Content changes since the last report\n\n");
+    if (report.changes().isEmpty()) {
+      md.append("No content changes since the last report.\n");
+    } else {
+      for (Change change : report.changes()) {
+        md.append(
+            "- "
+                + change.url()
+                + " — "
+                + change.status()
+                + " (detected "
+                + change.detectedAt()
+                + " UTC)\n");
+      }
+    }
+
+    md.append("\n## Availability (current)\n\n");
+    Health health = report.health();
+    md.append(
+        health.ok()
+            + " of "
+            + health.total()
+            + " monitored URLs are reachable and healthy."
+            + " Auth-protected responses (401/403) count as reachable.\n");
+    if (health.skipped() > 0) {
+      md.append(health.skipped() + " URL(s) not fetched because robots.txt disallows them.\n");
+    }
+    for (Problem problem : health.problems()) {
+      String cause = problem.error() != null ? problem.error() : "HTTP " + problem.statusCode();
+      md.append(
+          "- PROBLEM: "
+              + problem.url()
+              + " — "
+              + cause
+              + " (as of "
+              + problem.checkedAt()
+              + " UTC)\n");
+    }
+    return md.toString();
   }
 
   /**
