@@ -35,11 +35,58 @@ class ReportGeneratorTest {
   }
 
   @Test
-  void stablePagesAreNotReportedAsChanges() throws SQLException {
+  void stablePagesAreNotReportedAgainAfterBeingReported(@TempDir Path dir) throws Exception {
     ContentStore.record(conn, "https://a.com", "h1"); // NEW
-    ContentStore.record(conn, "https://a.com", "h1"); // UNCHANGED on re-crawl
+    ReportGenerator.generateAndWrite(conn, dir.resolve("r1.json").toString());
+    ContentStore.record(conn, "https://a.com", "h1"); // stable re-crawl
     ReportGenerator.Report report = ReportGenerator.generate(conn);
     assertTrue(report.changes().isEmpty());
+  }
+
+  @Test
+  void writingAReportAdvancesTheBaseline(@TempDir Path dir) throws Exception {
+    ContentStore.record(conn, "https://a.com", "h1");
+    ReportGenerator.Report report =
+        ReportGenerator.generateAndWrite(conn, dir.resolve("r1.json").toString());
+    assertEquals(1, report.changes().size());
+    assertEquals("NEW", report.changes().get(0).status());
+    // Nothing changed since — next report is empty
+    assertTrue(ReportGenerator.generate(conn).changes().isEmpty());
+  }
+
+  @Test
+  void changeAfterReportIsReportedAsChanged(@TempDir Path dir) throws Exception {
+    ContentStore.record(conn, "https://a.com", "h1");
+    ReportGenerator.generateAndWrite(conn, dir.resolve("r1.json").toString());
+    ContentStore.record(conn, "https://a.com", "h2");
+    ReportGenerator.Report report = ReportGenerator.generate(conn);
+    assertEquals(1, report.changes().size());
+    assertEquals("CHANGED", report.changes().get(0).status());
+  }
+
+  @Test
+  void changeThatWentStableBeforeTheReportIsStillReported(@TempDir Path dir) throws Exception {
+    ContentStore.record(conn, "https://a.com", "h1");
+    ReportGenerator.generateAndWrite(conn, dir.resolve("r1.json").toString());
+    ContentStore.record(conn, "https://a.com", "h2"); // CHANGED
+    ContentStore.record(conn, "https://a.com", "h2"); // stable on later crawls
+    assertEquals(1, ReportGenerator.generate(conn).changes().size());
+  }
+
+  @Test
+  void changeThatRevertedBeforeTheReportIsNotReported(@TempDir Path dir) throws Exception {
+    ContentStore.record(conn, "https://a.com", "h1");
+    ReportGenerator.generateAndWrite(conn, dir.resolve("r1.json").toString());
+    ContentStore.record(conn, "https://a.com", "h2");
+    ContentStore.record(conn, "https://a.com", "h1"); // back to the reported content
+    assertTrue(ReportGenerator.generate(conn).changes().isEmpty());
+  }
+
+  @Test
+  void generateAloneDoesNotAdvanceTheBaseline() throws SQLException {
+    ContentStore.record(conn, "https://a.com", "h1");
+    assertEquals(1, ReportGenerator.generate(conn).changes().size());
+    assertEquals(1, ReportGenerator.generate(conn).changes().size());
   }
 
   @Test

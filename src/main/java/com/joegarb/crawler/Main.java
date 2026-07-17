@@ -38,8 +38,8 @@ public class Main {
       DatabaseManager.initializeDatabase();
       if (reportMode) {
         try (Connection conn = DatabaseManager.getConnection()) {
-          ReportGenerator.Report report = ReportGenerator.generate(conn);
-          ReportGenerator.writeJson(report, Configuration.REPORT_FILE);
+          ReportGenerator.Report report =
+              ReportGenerator.generateAndWrite(conn, Configuration.REPORT_FILE);
           logger.info("{}", ReportGenerator.summarize(report));
           logger.info("Report written to {}", Configuration.REPORT_FILE);
         }
