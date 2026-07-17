@@ -14,8 +14,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Manages the frontier queue of URLs to be crawled.
  *
- * <p>Note: Database migrations have not been implemented, so deleting the database file is
- * necessary to pick up schema changes.
+ * <p>Schema changes require a matching migration in {@link DatabaseManager}.
  */
 public class FrontierStore {
   private static final Logger logger = LoggerFactory.getLogger(FrontierStore.class);
