@@ -72,6 +72,13 @@ public class Crawler {
               }
             });
       }
+
+      // Clear the interrupt before the executor closes: close() must drain in-flight pages
+      // rather than interrupt them mid-fetch, which would record phantom failures. Unprocessed
+      // claimed URLs are recovered by resetClaimedUrls on the next start.
+      if (Thread.interrupted()) {
+        logger.info("Stopping crawl, waiting for {} in-flight page(s)...", inFlight.get());
+      }
     }
   }
 }
