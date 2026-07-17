@@ -86,6 +86,23 @@ volumes:
   crawler-data:
 ```
 
+### Seeding from Docker labels
+
+Instead of passing start URLs, the crawler can discover them from the labels of running containers: every host named in a Traefik router rule (`traefik.http.routers.<name>.rule` with `Host(...)`) becomes a seed. Mount the Docker socket read-only and enable the flag:
+
+```yaml
+services:
+  crawler:
+    image: ghcr.io/joegarb/crawler:latest
+    volumes:
+      - crawler-data:/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - DB_URL=jdbc:sqlite:/data/crawler.db
+      - SEED_FROM_DOCKER_LABELS=true
+      - RESTRICT_TO_HOST=true
+```
+
 ## Configuration
 
 The crawler can be configured using environment variables or the `application.properties` file, with environment variables taking precedence. They can be prepended to the `./crawl` command inline:
@@ -102,4 +119,6 @@ Some of these include:
 - `RESTRICT_TO_HOST` - Whether to restrict crawling to the same host and its subdomains (default: `false`)
 - `REPORT_FILE` - File path the JSON report is written to in `--report` mode (default: `report.json`)
 - `CHANGE_TRACKING_EXCLUDE_URLS` - Comma-separated URL glob patterns excluded from change tracking (default: none)
+- `SEED_FROM_DOCKER_LABELS` - Discover seed URLs from Traefik router rules on running containers (default: `false`)
+- `DOCKER_SOCKET` - Docker socket path for label-based seed discovery (default: `/var/run/docker.sock`)
 - `LOG_LEVEL` - Log level (default: `INFO`, set to `DEBUG` for verbose output)
