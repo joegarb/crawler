@@ -39,7 +39,7 @@ public class Configuration {
 
   /** Whether to restrict crawling to the same host (and its subdomains). */
   public static final boolean RESTRICT_TO_HOST =
-      getBooleanProperty("restrict.to.host", "RESTRICT_TO_HOST", false);
+      getBooleanProperty("restrict.to.host", "RESTRICT_TO_HOST", true);
 
   /** File path the JSON monitor report is written to in --report mode. */
   public static final String REPORT_FILE = getProperty("report.file", "REPORT_FILE", "report.json");
