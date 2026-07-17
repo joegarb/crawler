@@ -114,7 +114,7 @@ LOG_LEVEL=debug ./crawl <startUrl>
 Some of these include:
 
 - `DB_URL` - Database connection URL (default: `jdbc:sqlite:crawler.db`)
-- `NUM_THREADS` - Number of worker threads (default: `4`)
+- `NUM_THREADS` - Maximum number of pages fetched concurrently (default: `4`)
 - `POLITENESS_DELAY_MS` - Minimum delay in milliseconds between requests to the same domain (default: `1000`)
 - `RESTRICT_TO_HOST` - Whether to restrict crawling to the same host and its subdomains (default: `false`)
 - `REPORT_FILE` - File path the JSON report is written to in `--report` mode (default: `report.json`)
