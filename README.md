@@ -24,6 +24,8 @@ Crawl starting from a URL:
 
 As it crawls, each page's content is fingerprinted from its visible text and compared against the previous crawl, so re-crawling a site detects new and changed pages. Hashing the visible text (rather than the raw HTML) avoids false positives from markup churn such as CSRF tokens or timestamps.
 
+By default the crawl stays on the start URL's host (and its subdomains). Set `RESTRICT_TO_HOST=false` to follow external links too — but note the frontier can then grow without bound, so only do so deliberately.
+
 To resume a previously interrupted crawl, omit the URL — the crawler will continue from the existing frontier:
 
 ```bash
@@ -100,7 +102,6 @@ services:
     environment:
       - DB_URL=jdbc:sqlite:/data/crawler.db
       - SEED_FROM_DOCKER_LABELS=true
-      - RESTRICT_TO_HOST=true
 ```
 
 ## Configuration
@@ -116,7 +117,7 @@ Some of these include:
 - `DB_URL` - Database connection URL (default: `jdbc:sqlite:crawler.db`)
 - `NUM_THREADS` - Maximum number of pages fetched concurrently (default: `4`)
 - `POLITENESS_DELAY_MS` - Minimum delay in milliseconds between requests to the same domain (default: `1000`)
-- `RESTRICT_TO_HOST` - Whether to restrict crawling to the same host and its subdomains (default: `false`)
+- `RESTRICT_TO_HOST` - Whether to restrict crawling to the same host and its subdomains (default: `true`)
 - `REPORT_FILE` - File path the JSON report is written to in `--report` mode (default: `report.json`)
 - `CHANGE_TRACKING_EXCLUDE_URLS` - Comma-separated URL glob patterns excluded from change tracking (default: none)
 - `SEED_FROM_DOCKER_LABELS` - Discover seed URLs from Traefik router rules on running containers (default: `false`)
