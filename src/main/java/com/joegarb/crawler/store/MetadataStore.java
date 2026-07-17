@@ -13,8 +13,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Manages metadata about crawled URLs.
  *
- * <p>Note: Database migrations have not been implemented, so deleting the database file is
- * necessary to pick up schema changes.
+ * <p>Schema changes require a matching migration in {@link DatabaseManager}.
  */
 public class MetadataStore {
   private static final Logger logger = LoggerFactory.getLogger(MetadataStore.class);

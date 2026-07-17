@@ -16,8 +16,7 @@ import org.slf4j.LoggerFactory;
  * stored change status always reflects the most recent crawl: a page that was new and has since
  * been stable reads as UNCHANGED rather than remaining NEW.
  *
- * <p>Note: Database migrations have not been implemented, so deleting the database file is
- * necessary to pick up schema changes.
+ * <p>Schema changes require a matching migration in {@link DatabaseManager}.
  */
 public class ContentStore {
   private static final Logger logger = LoggerFactory.getLogger(ContentStore.class);
