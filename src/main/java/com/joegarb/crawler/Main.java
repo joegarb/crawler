@@ -1,6 +1,7 @@
 package com.joegarb.crawler;
 
 import com.joegarb.crawler.report.ReportGenerator;
+import com.joegarb.crawler.seed.DockerLabelSeedSource;
 import com.joegarb.crawler.seed.SeedSource;
 import com.joegarb.crawler.seed.StaticSeedSource;
 import com.joegarb.crawler.store.DatabaseManager;
@@ -45,10 +46,17 @@ public class Main {
         }
         return;
       }
-      SeedSource seedSource = new StaticSeedSource(startUrls);
+      List<SeedSource> seedSources = new ArrayList<>();
+      seedSources.add(new StaticSeedSource(startUrls));
+      if (Configuration.SEED_FROM_DOCKER_LABELS) {
+        seedSources.add(new DockerLabelSeedSource(Configuration.DOCKER_SOCKET));
+      }
       try (Connection conn = DatabaseManager.getConnection()) {
         FrontierStore.resetClaimedUrls(conn);
-        List<String> seeds = seedSource.seeds();
+        List<String> seeds = new ArrayList<>();
+        for (SeedSource seedSource : seedSources) {
+          seeds.addAll(seedSource.seeds());
+        }
         if (!seeds.isEmpty()) {
           FrontierStore.addUrls(conn, seeds);
           logger.info("Seed URLs: {}", seeds);

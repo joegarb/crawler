@@ -44,6 +44,14 @@ public class Configuration {
   /** File path the JSON monitor report is written to in --report mode. */
   public static final String REPORT_FILE = getProperty("report.file", "REPORT_FILE", "report.json");
 
+  /** Whether to discover seed URLs from Docker container labels (Traefik router rules). */
+  public static final boolean SEED_FROM_DOCKER_LABELS =
+      getBooleanProperty("seed.from.docker.labels", "SEED_FROM_DOCKER_LABELS", false);
+
+  /** Path to the Docker socket used for label-based seed discovery. */
+  public static final String DOCKER_SOCKET =
+      getProperty("docker.socket", "DOCKER_SOCKET", "/var/run/docker.sock");
+
   /**
    * URL glob patterns (comma-separated) excluded from change tracking, e.g. volatile index pages.
    */
