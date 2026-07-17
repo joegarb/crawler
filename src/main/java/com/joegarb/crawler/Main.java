@@ -9,6 +9,7 @@ import com.joegarb.crawler.store.FrontierStore;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
@@ -76,6 +77,21 @@ public class Main {
     }
 
     logger.info("Max concurrent fetches: {}", Configuration.NUM_THREADS);
+    Thread mainThread = Thread.currentThread();
+    Runtime.getRuntime()
+        .addShutdownHook(
+            new Thread(
+                () -> {
+                  logger.info("Shutdown requested, finishing in-flight pages...");
+                  mainThread.interrupt();
+                  try {
+                    // Keep the JVM alive while the crawl drains; give up after a bound so a
+                    // stuck fetch cannot block shutdown indefinitely
+                    mainThread.join(Duration.ofSeconds(15));
+                  } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                  }
+                }));
     new Crawler().crawl();
 
     logger.info("Crawl complete.");
