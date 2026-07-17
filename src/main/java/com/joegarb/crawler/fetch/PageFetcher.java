@@ -73,6 +73,15 @@ public class PageFetcher {
     }
 
     /**
+     * Checks whether the server answered a conditional request with 304 Not Modified.
+     *
+     * @return true if the response is a 304, false otherwise
+     */
+    public boolean isNotModified() {
+      return response != null && response.statusCode() == 304;
+    }
+
+    /**
      * Checks if the response content type is HTML.
      *
      * @return true if the response appears to be HTML, false otherwise
@@ -94,22 +103,44 @@ public class PageFetcher {
    * @return FetchResult containing the response or error information
    */
   public FetchResult fetch(String url) {
+    return fetch(url, null);
+  }
+
+  /**
+   * Fetches a web page, conditionally when cache validators from a previous response are given.
+   *
+   * @param url The URL to fetch
+   * @param validators ETag/Last-Modified from the previous response, or null for an unconditional
+   *     fetch
+   * @return FetchResult containing the response or error information; a 304 Not Modified answer is
+   *     a success with {@code isNotModified()} set
+   */
+  public FetchResult fetch(String url, Validators validators) {
     try {
-      HttpRequest request =
+      HttpRequest.Builder builder =
           HttpRequest.newBuilder()
               .uri(URI.create(url))
               .timeout(Duration.ofSeconds(Configuration.HTTP_TIMEOUT_SECONDS))
               .header("User-Agent", USER_AGENT)
-              .GET()
-              .build();
+              .GET();
+      if (validators != null) {
+        if (validators.etag() != null) {
+          builder.header("If-None-Match", validators.etag());
+        }
+        if (validators.lastModified() != null) {
+          builder.header("If-Modified-Since", validators.lastModified());
+        }
+      }
+      HttpRequest request = builder.build();
 
       HttpResponse<String> response =
           httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
-      // Consider 2xx status codes as success, everything else as failure
+      // Consider 2xx status codes and 304 Not Modified as success, everything else as failure
       // Note: With followRedirects enabled, 3xx should be automatically followed.
-      // If we see a 3xx here, it indicates a redirect loop or too many redirects.
-      if (response.statusCode() >= 200 && response.statusCode() < 300) {
+      // If we see another 3xx here, it indicates a redirect loop or too many redirects.
+      if (response.statusCode() >= 200 && response.statusCode() < 300
+          || response.statusCode() == 304) {
         return FetchResult.success(response);
       } else {
         // HTTP error response (3xx redirect issues, 4xx, 5xx, etc.)

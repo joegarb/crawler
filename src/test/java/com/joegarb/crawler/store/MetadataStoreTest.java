@@ -1,8 +1,11 @@
 package com.joegarb.crawler.store;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.joegarb.crawler.fetch.Validators;
 import com.joegarb.crawler.url.UrlNormalizer;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -35,6 +38,33 @@ class MetadataStoreTest {
     String normalizedUrl = UrlNormalizer.normalize("https://example.com");
     MetadataStore.markAsCrawled(conn, normalizedUrl, 200, null);
     assertTrue(MetadataStore.hasBeenCrawled(conn, normalizedUrl));
+  }
+
+  @Test
+  void notModifiedResponseCountsAsFresh() throws SQLException {
+    String normalizedUrl = UrlNormalizer.normalize("https://example.com");
+    MetadataStore.markAsCrawled(conn, normalizedUrl, 304, null);
+    assertTrue(MetadataStore.hasBeenCrawled(conn, normalizedUrl));
+  }
+
+  @Test
+  void storesAndReturnsValidators() throws SQLException {
+    MetadataStore.markAsCrawled(
+        conn,
+        "https://example.com/",
+        200,
+        null,
+        new Validators("\"abc\"", "Wed, 01 Jan 2025 00:00:00 GMT"));
+    Validators validators = MetadataStore.getValidators(conn, "https://example.com/");
+    assertEquals("\"abc\"", validators.etag());
+    assertEquals("Wed, 01 Jan 2025 00:00:00 GMT", validators.lastModified());
+  }
+
+  @Test
+  void getValidatorsReturnsNullWhenNoneStored() throws SQLException {
+    MetadataStore.markAsCrawled(conn, "https://example.com/", 200, null);
+    assertNull(MetadataStore.getValidators(conn, "https://example.com/"));
+    assertNull(MetadataStore.getValidators(conn, "https://unknown.example.com/"));
   }
 
   @Test

@@ -1,6 +1,7 @@
 package com.joegarb.crawler.store;
 
 import com.joegarb.crawler.Configuration;
+import com.joegarb.crawler.fetch.Validators;
 import com.joegarb.crawler.url.UrlNormalizer;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -30,7 +31,9 @@ public class MetadataStore {
             + "url TEXT PRIMARY KEY,"
             + "crawled_at TEXT NOT NULL DEFAULT (datetime('now')),"
             + "http_status_code INTEGER,"
-            + "error_message TEXT"
+            + "error_message TEXT,"
+            + "etag TEXT,"
+            + "last_modified TEXT"
             + ")";
     try (Statement statement = conn.createStatement()) {
       statement.execute(sql);
@@ -53,8 +56,31 @@ public class MetadataStore {
   public static void markAsCrawled(
       Connection conn, String url, Integer httpStatusCode, String errorMessage)
       throws SQLException {
+    markAsCrawled(conn, url, httpStatusCode, errorMessage, null);
+  }
+
+  /**
+   * Records that a URL has been crawled, along with the response's cache validators used for
+   * conditional requests on the next fetch.
+   *
+   * @param conn Database connection
+   * @param url URL that was crawled
+   * @param httpStatusCode HTTP status code if an HTTP response was received, null for network
+   *     errors
+   * @param errorMessage Error message if the crawl failed, null if successful
+   * @param validators ETag/Last-Modified of the response, null to store none
+   * @throws SQLException if a database access error occurs
+   */
+  public static void markAsCrawled(
+      Connection conn,
+      String url,
+      Integer httpStatusCode,
+      String errorMessage,
+      Validators validators)
+      throws SQLException {
     String sql =
-        "INSERT OR REPLACE INTO crawled_urls (url, http_status_code, error_message) VALUES (?, ?, ?)";
+        "INSERT OR REPLACE INTO crawled_urls (url, http_status_code, error_message, etag,"
+            + " last_modified) VALUES (?, ?, ?, ?, ?)";
     try (PreparedStatement statement = conn.prepareStatement(sql)) {
       statement.setString(1, url);
       if (httpStatusCode != null) {
@@ -63,8 +89,35 @@ public class MetadataStore {
         statement.setNull(2, java.sql.Types.INTEGER);
       }
       statement.setString(3, errorMessage);
+      statement.setString(4, validators != null ? validators.etag() : null);
+      statement.setString(5, validators != null ? validators.lastModified() : null);
       statement.executeUpdate();
     }
+  }
+
+  /**
+   * Returns the stored cache validators for a URL, or null if none are recorded.
+   *
+   * @param conn Database connection
+   * @param url URL to look up
+   * @return the validators, or null when the URL is unknown or has none
+   * @throws SQLException if a database access error occurs
+   */
+  public static Validators getValidators(Connection conn, String url) throws SQLException {
+    String sql = "SELECT etag, last_modified FROM crawled_urls WHERE url = ?";
+    try (PreparedStatement statement = conn.prepareStatement(sql)) {
+      statement.setString(1, url);
+      try (ResultSet resultSet = statement.executeQuery()) {
+        if (resultSet.next()) {
+          String etag = resultSet.getString("etag");
+          String lastModified = resultSet.getString("last_modified");
+          if (etag != null || lastModified != null) {
+            return new Validators(etag, lastModified);
+          }
+        }
+      }
+    }
+    return null;
   }
 
   /**
@@ -99,8 +152,8 @@ public class MetadataStore {
         String crawledAt = resultSet.getString("crawled_at");
 
         int retryInterval;
-        if (statusCode != null && statusCode >= 200 && statusCode < 300) {
-          // Successful URL - use refresh interval
+        if (statusCode != null && (statusCode >= 200 && statusCode < 300 || statusCode == 304)) {
+          // Successful URL (304 = confirmed unchanged) - use refresh interval
           retryInterval = Configuration.SUCCESS_REFRESH_INTERVAL_SECONDS;
         } else {
           // Failed URL (non-2xx or NULL) - use retry interval

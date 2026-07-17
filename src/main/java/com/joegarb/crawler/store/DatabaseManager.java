@@ -39,7 +39,12 @@ public class DatabaseManager {
    * entirely. To change the schema: update the relevant createTable, then append the equivalent
    * ALTER statements here.
    */
-  private static final List<List<String>> MIGRATIONS = List.of();
+  private static final List<List<String>> MIGRATIONS =
+      List.of(
+          // v1 -> v2: cache validators for conditional requests
+          List.of(
+              "ALTER TABLE crawled_urls ADD COLUMN etag TEXT",
+              "ALTER TABLE crawled_urls ADD COLUMN last_modified TEXT"));
 
   static final int CURRENT_SCHEMA_VERSION = MIGRATIONS.size() + 1;
 

@@ -6,6 +6,7 @@ import com.joegarb.crawler.extract.ContentHasher;
 import com.joegarb.crawler.extract.LinkExtractor;
 import com.joegarb.crawler.fetch.PageFetcher;
 import com.joegarb.crawler.fetch.RobotsCache;
+import com.joegarb.crawler.fetch.Validators;
 import com.joegarb.crawler.store.ChangeStatus;
 import com.joegarb.crawler.store.ContentStore;
 import com.joegarb.crawler.store.DatabaseManager;
@@ -59,9 +60,16 @@ public class Worker implements Runnable {
       }
     }
 
-    PageFetcher.FetchResult result = pageFetcher.fetch(frontierUrl.url());
+    Validators validators = MetadataStore.getValidators(conn, frontierUrl.url());
+    PageFetcher.FetchResult result = pageFetcher.fetch(frontierUrl.url(), validators);
 
-    if (result.success() && result.isHtml()) {
+    if (result.isNotModified()) {
+      // Server confirmed the content is unchanged — no body to hash, no links to extract.
+      // Keep the validators that produced the 304 for the next conditional request.
+      logger.info("{} not modified (304)", frontierUrl.url());
+      MetadataStore.markAsCrawled(
+          conn, frontierUrl.url(), result.httpStatusCode(), null, validators);
+    } else if (result.success() && result.isHtml()) {
       List<String> links = LinkExtractor.extractLinks(result.response().body(), frontierUrl.url());
 
       StringBuilder output = new StringBuilder(frontierUrl.url());
@@ -89,11 +97,13 @@ public class Worker implements Runnable {
         }
       }
 
-      MetadataStore.markAsCrawled(conn, frontierUrl.url(), result.httpStatusCode(), null);
+      MetadataStore.markAsCrawled(
+          conn, frontierUrl.url(), result.httpStatusCode(), null, responseValidators(result));
     } else if (result.success() && !result.isHtml()) {
       // Successfully fetched but not HTML - mark as crawled but don't extract links
       logger.info(frontierUrl.url());
-      MetadataStore.markAsCrawled(conn, frontierUrl.url(), result.httpStatusCode(), null);
+      MetadataStore.markAsCrawled(
+          conn, frontierUrl.url(), result.httpStatusCode(), null, responseValidators(result));
     } else {
       logger.warn("Failed to fetch URL: {} - {}", frontierUrl.url(), result.errorMessage());
 
@@ -103,5 +113,14 @@ public class Worker implements Runnable {
 
     DomainAccessStore.recordAccess(conn, frontierUrl.domain());
     FrontierStore.removeUrl(conn, frontierUrl.id());
+  }
+
+  private static Validators responseValidators(PageFetcher.FetchResult result) {
+    String etag = result.response().headers().firstValue("ETag").orElse(null);
+    String lastModified = result.response().headers().firstValue("Last-Modified").orElse(null);
+    if (etag == null && lastModified == null) {
+      return null;
+    }
+    return new Validators(etag, lastModified);
   }
 }
