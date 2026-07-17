@@ -4,7 +4,7 @@ A web crawler and site monitor written in Java. It crawls politely (respecting r
 
 ## Prerequisites
 
-- Java 21 or later
+- Java 25 or later
 
 ## Building
 
