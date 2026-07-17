@@ -18,7 +18,7 @@ public class Configuration {
   /** Database connection URL. */
   public static final String DB_URL = getProperty("db.url", "DB_URL", "jdbc:sqlite:crawler.db");
 
-  /** Number of worker threads per process. */
+  /** Maximum number of pages fetched concurrently. */
   public static final int NUM_THREADS = getIntProperty("num.threads", "NUM_THREADS", 4);
 
   /** Minimum delay in milliseconds between requests to the same domain. */

@@ -75,22 +75,8 @@ public class Main {
       System.exit(1);
     }
 
-    logger.info("Worker threads: {}", Configuration.NUM_THREADS);
-    Worker[] workers = new Worker[Configuration.NUM_THREADS];
-    for (int i = 0; i < Configuration.NUM_THREADS; i++) {
-      workers[i] = new Worker();
-      workers[i].start();
-    }
-
-    for (Worker worker : workers) {
-      try {
-        worker.join();
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        logger.error("Interrupted while waiting for workers to complete");
-        System.exit(1);
-      }
-    }
+    logger.info("Max concurrent fetches: {}", Configuration.NUM_THREADS);
+    new Crawler().crawl();
 
     logger.info("Crawl complete.");
   }
