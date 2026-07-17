@@ -34,7 +34,9 @@ public class ContentStore {
             + "url TEXT PRIMARY KEY,"
             + "content_hash TEXT NOT NULL,"
             + "change_status TEXT NOT NULL,"
-            + "fetched_at TEXT NOT NULL DEFAULT (datetime('now'))"
+            + "fetched_at TEXT NOT NULL DEFAULT (datetime('now')),"
+            + "changed_at TEXT,"
+            + "reported_hash TEXT"
             + ")";
     try (Statement statement = conn.createStatement()) {
       statement.execute(sql);
@@ -87,9 +89,17 @@ public class ContentStore {
     }
 
     // Upsert every crawl (including UNCHANGED) so the stored status reflects the latest crawl.
+    // changed_at only moves when the content actually changed, and reported_hash — the baseline
+    // the report diffs against — is never touched here.
     String sql =
-        "INSERT OR REPLACE INTO page_content (url, content_hash, change_status, fetched_at)"
-            + " VALUES (?, ?, ?, datetime('now'))";
+        "INSERT INTO page_content (url, content_hash, change_status, fetched_at, changed_at)"
+            + " VALUES (?, ?, ?, datetime('now'), datetime('now'))"
+            + " ON CONFLICT(url) DO UPDATE SET"
+            + " content_hash = excluded.content_hash,"
+            + " change_status = excluded.change_status,"
+            + " fetched_at = excluded.fetched_at,"
+            + " changed_at = CASE WHEN excluded.change_status = 'UNCHANGED'"
+            + " THEN page_content.changed_at ELSE excluded.changed_at END";
     try (PreparedStatement statement = conn.prepareStatement(sql)) {
       statement.setString(1, url);
       statement.setString(2, contentHash);

@@ -43,7 +43,8 @@ public final class ReportGenerator {
   private ReportGenerator() {}
 
   /**
-   * Builds a report from the current database state.
+   * Builds a report from the current database state. Changes are relative to the last written
+   * report; generating alone does not advance that baseline.
    *
    * @param conn Database connection
    * @return the report
@@ -51,6 +52,35 @@ public final class ReportGenerator {
    */
   public static Report generate(Connection conn) throws SQLException {
     return new Report(Instant.now().toString(), queryChanges(conn), queryHealth(conn));
+  }
+
+  /**
+   * Builds the report, writes it as JSON, and advances the reported-content baseline so the next
+   * report only includes changes detected after this one. The baseline advances only if the report
+   * file is written successfully.
+   *
+   * @param conn Database connection
+   * @param path destination file path
+   * @return the written report
+   * @throws SQLException if a database access error occurs
+   * @throws IOException if the file cannot be written
+   */
+  public static Report generateAndWrite(Connection conn, String path)
+      throws SQLException, IOException {
+    boolean originalAutoCommit = conn.getAutoCommit();
+    conn.setAutoCommit(false);
+    try {
+      Report report = generate(conn);
+      writeJson(report, path);
+      markReported(conn);
+      conn.commit();
+      return report;
+    } catch (SQLException | IOException e) {
+      conn.rollback();
+      throw e;
+    } finally {
+      conn.setAutoCommit(originalAutoCommit);
+    }
   }
 
   /**
@@ -82,22 +112,33 @@ public final class ReportGenerator {
   }
 
   private static List<Change> queryChanges(Connection conn) throws SQLException {
-    // Pages whose current status (as of the latest crawl) is new or changed. Stable pages read as
-    // UNCHANGED and are excluded.
+    // Pages whose current content differs from what the last report saw (reported_hash). Pages
+    // never reported before are NEW; pages that changed and reverted read as equal and drop out.
     String sql =
-        "SELECT url, change_status, fetched_at FROM page_content"
-            + " WHERE change_status IN ('NEW', 'CHANGED')"
-            + " ORDER BY fetched_at DESC";
+        "SELECT url,"
+            + " CASE WHEN reported_hash IS NULL THEN 'NEW' ELSE 'CHANGED' END AS change_status,"
+            + " changed_at FROM page_content"
+            + " WHERE reported_hash IS NULL OR reported_hash <> content_hash"
+            + " ORDER BY changed_at DESC";
     List<Change> changes = new ArrayList<>();
     try (Statement statement = conn.createStatement();
         ResultSet rs = statement.executeQuery(sql)) {
       while (rs.next()) {
         changes.add(
             new Change(
-                rs.getString("url"), rs.getString("change_status"), rs.getString("fetched_at")));
+                rs.getString("url"), rs.getString("change_status"), rs.getString("changed_at")));
       }
     }
     return changes;
+  }
+
+  private static void markReported(Connection conn) throws SQLException {
+    String sql =
+        "UPDATE page_content SET reported_hash = content_hash"
+            + " WHERE reported_hash IS NULL OR reported_hash <> content_hash";
+    try (Statement statement = conn.createStatement()) {
+      statement.executeUpdate(sql);
+    }
   }
 
   private static Health queryHealth(Connection conn) throws SQLException {
