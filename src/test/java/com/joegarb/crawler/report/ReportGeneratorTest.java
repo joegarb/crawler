@@ -37,7 +37,8 @@ class ReportGeneratorTest {
   @Test
   void stablePagesAreNotReportedAgainAfterBeingReported(@TempDir Path dir) throws Exception {
     ContentStore.record(conn, "https://a.com", "h1"); // NEW
-    ReportGenerator.generateAndWrite(conn, dir.resolve("r1.json").toString());
+    ReportGenerator.generateAndWrite(
+        conn, dir.resolve("r1.json").toString(), dir.resolve("r1.md").toString());
     ContentStore.record(conn, "https://a.com", "h1"); // stable re-crawl
     ReportGenerator.Report report = ReportGenerator.generate(conn);
     assertTrue(report.changes().isEmpty());
@@ -47,7 +48,8 @@ class ReportGeneratorTest {
   void writingAReportAdvancesTheBaseline(@TempDir Path dir) throws Exception {
     ContentStore.record(conn, "https://a.com", "h1");
     ReportGenerator.Report report =
-        ReportGenerator.generateAndWrite(conn, dir.resolve("r1.json").toString());
+        ReportGenerator.generateAndWrite(
+            conn, dir.resolve("r1.json").toString(), dir.resolve("r1.md").toString());
     assertEquals(1, report.changes().size());
     assertEquals("NEW", report.changes().get(0).status());
     // Nothing changed since — next report is empty
@@ -57,7 +59,8 @@ class ReportGeneratorTest {
   @Test
   void changeAfterReportIsReportedAsChanged(@TempDir Path dir) throws Exception {
     ContentStore.record(conn, "https://a.com", "h1");
-    ReportGenerator.generateAndWrite(conn, dir.resolve("r1.json").toString());
+    ReportGenerator.generateAndWrite(
+        conn, dir.resolve("r1.json").toString(), dir.resolve("r1.md").toString());
     ContentStore.record(conn, "https://a.com", "h2");
     ReportGenerator.Report report = ReportGenerator.generate(conn);
     assertEquals(1, report.changes().size());
@@ -67,7 +70,8 @@ class ReportGeneratorTest {
   @Test
   void changeThatWentStableBeforeTheReportIsStillReported(@TempDir Path dir) throws Exception {
     ContentStore.record(conn, "https://a.com", "h1");
-    ReportGenerator.generateAndWrite(conn, dir.resolve("r1.json").toString());
+    ReportGenerator.generateAndWrite(
+        conn, dir.resolve("r1.json").toString(), dir.resolve("r1.md").toString());
     ContentStore.record(conn, "https://a.com", "h2"); // CHANGED
     ContentStore.record(conn, "https://a.com", "h2"); // stable on later crawls
     assertEquals(1, ReportGenerator.generate(conn).changes().size());
@@ -76,10 +80,36 @@ class ReportGeneratorTest {
   @Test
   void changeThatRevertedBeforeTheReportIsNotReported(@TempDir Path dir) throws Exception {
     ContentStore.record(conn, "https://a.com", "h1");
-    ReportGenerator.generateAndWrite(conn, dir.resolve("r1.json").toString());
+    ReportGenerator.generateAndWrite(
+        conn, dir.resolve("r1.json").toString(), dir.resolve("r1.md").toString());
     ContentStore.record(conn, "https://a.com", "h2");
     ContentStore.record(conn, "https://a.com", "h1"); // back to the reported content
     assertTrue(ReportGenerator.generate(conn).changes().isEmpty());
+  }
+
+  @Test
+  void writesMarkdownReportWithChangesAndProblems(@TempDir Path dir) throws Exception {
+    ContentStore.record(conn, "https://a.com/", "h1");
+    MetadataStore.markAsCrawled(conn, "https://a.com/", 200, null);
+    MetadataStore.markAsCrawled(conn, "https://down.com/", null, "Network error: refused");
+    Path md = dir.resolve("report.md");
+    ReportGenerator.generateAndWrite(conn, dir.resolve("report.json").toString(), md.toString());
+    String text = Files.readString(md);
+    assertTrue(text.contains("# Site monitor report"));
+    assertTrue(text.contains("- https://a.com/ — NEW"));
+    assertTrue(text.contains("1 of 2 monitored URLs are reachable and healthy"));
+    assertTrue(text.contains("- PROBLEM: https://down.com/ — Network error: refused"));
+  }
+
+  @Test
+  void markdownReportsNoChangesWhenBaselineIsCurrent(@TempDir Path dir) throws Exception {
+    ContentStore.record(conn, "https://a.com/", "h1");
+    ReportGenerator.generateAndWrite(
+        conn, dir.resolve("r1.json").toString(), dir.resolve("r1.md").toString());
+    Path md = dir.resolve("r2.md");
+    ReportGenerator.generateAndWrite(conn, dir.resolve("r2.json").toString(), md.toString());
+    String text = Files.readString(md);
+    assertTrue(text.contains("No content changes since the last report."));
   }
 
   @Test

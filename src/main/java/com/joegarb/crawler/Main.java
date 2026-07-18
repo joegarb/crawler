@@ -41,9 +41,13 @@ public class Main {
       if (reportMode) {
         try (Connection conn = DatabaseManager.getConnection()) {
           ReportGenerator.Report report =
-              ReportGenerator.generateAndWrite(conn, Configuration.REPORT_FILE);
+              ReportGenerator.generateAndWrite(
+                  conn, Configuration.REPORT_FILE, Configuration.REPORT_MD_FILE);
           logger.info("{}", ReportGenerator.summarize(report));
-          logger.info("Report written to {}", Configuration.REPORT_FILE);
+          logger.info(
+              "Report written to {} and {}",
+              Configuration.REPORT_FILE,
+              Configuration.REPORT_MD_FILE);
         }
         return;
       }

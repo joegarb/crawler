@@ -44,6 +44,10 @@ public class Configuration {
   /** File path the JSON monitor report is written to in --report mode. */
   public static final String REPORT_FILE = getProperty("report.file", "REPORT_FILE", "report.json");
 
+  /** File path the human-readable markdown report is written to in --report mode. */
+  public static final String REPORT_MD_FILE =
+      getProperty("report.md.file", "REPORT_MD_FILE", "report.md");
+
   /** Whether to discover seed URLs from Docker container labels (Traefik router rules). */
   public static final boolean SEED_FROM_DOCKER_LABELS =
       getBooleanProperty("seed.from.docker.labels", "SEED_FROM_DOCKER_LABELS", false);
