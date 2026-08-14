@@ -24,9 +24,29 @@ jobs:
       - name: Smoke-test image
         run: docker run --rm crawler:ci --report
 
-  publish-pr:
+  # Publish PR images only for things worth hand-testing: skip Dependabot
+  # patch/minor (those auto-merge untested), keep majors and human PRs.
+  pr-image-check:
     if: github.event_name == 'pull_request'
-    needs: build
+    runs-on: ubuntu-latest
+    outputs:
+      publish: ${{ steps.decide.outputs.publish }}
+    steps:
+      - id: meta
+        if: github.actor == 'dependabot[bot]'
+        uses: dependabot/fetch-metadata@v2
+      - id: decide
+        run: |
+          t="${{ steps.meta.outputs.update-type }}"
+          if [ "$t" = "version-update:semver-patch" ] || [ "$t" = "version-update:semver-minor" ]; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  publish-pr:
+    if: github.event_name == 'pull_request' && needs.pr-image-check.outputs.publish == 'true'
+    needs: [build, pr-image-check]
     runs-on: ubuntu-latest
     permissions:
       contents: read
